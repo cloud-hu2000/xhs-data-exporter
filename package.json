@@ -1,0 +1,20 @@
+{
+  "name": "xhs-data-exporter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Export Xiaohongshu creator note detail data from a logged-in browser session.",
+  "type": "commonjs",
+  "scripts": {
+    "browser": "node src/open-browser.js",
+    "export": "node src/export-xhs.js",
+    "inspect": "node src/inspect-page.js",
+    "import": "node src/import-xhs-data.js",
+    "dashboard": "node src/dashboard-server.js"
+  },
+  "dependencies": {
+    "echarts": "^6.1.0",
+    "express": "^5.2.1",
+    "playwright-core": "^1.56.0",
+    "xlsx": "^0.18.5"
+  }
+}

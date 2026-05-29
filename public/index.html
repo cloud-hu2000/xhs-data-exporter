@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小红书数据分析中心</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">小</div>
+          <div>
+            <div class="brand-name">数据分析中心</div>
+            <div class="brand-sub">小红书创作者</div>
+          </div>
+        </div>
+
+        <nav class="menu">
+          <div class="menu-group">
+            <div class="menu-label">分析</div>
+            <button class="menu-item" type="button" data-view="overview">
+              <span class="menu-icon">□</span>
+              总览
+            </button>
+            <button class="menu-item active" type="button" data-view="lifecycle">
+              <span class="menu-icon">↗</span>
+              生命周期对比
+            </button>
+            <button class="menu-item" type="button" data-view="notes">
+              <span class="menu-icon">≡</span>
+              笔记横向表
+            </button>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-label">数据</div>
+            <button class="menu-item" type="button" data-view="import">
+              <span class="menu-icon">↻</span>
+              导入管理
+            </button>
+          </div>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="main-top">
+          <div>
+            <div class="breadcrumb">数据看板 / 生命周期对比</div>
+            <h1>笔记生命周期对比</h1>
+          </div>
+          <button id="refreshBtn" class="button primary" type="button">重新导入</button>
+        </header>
+
+        <section class="content-card compact-summary">
+          <div class="summary-item">
+            <span>导入笔记</span>
+            <strong id="noteCount">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>总曝光</span>
+            <strong id="totalImpressions">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>总观看</span>
+            <strong id="totalViews">-</strong>
+          </div>
+          <div class="summary-item">
+            <span>总互动</span>
+            <strong id="totalInteractions">-</strong>
+          </div>
+          <div class="summary-meta" id="syncMeta">正在读取本地导出数据...</div>
+        </section>
+
+        <section class="content-card">
+          <div class="panel-head">
+            <div>
+              <h2>发布后时间轴</h2>
+              <p>按发布后 1小时、6小时、24小时、3天、7天、14天对齐，不同发布时间的笔记可以公平比较。</p>
+            </div>
+            <div class="toolbar">
+              <input id="searchInput" class="search-input" type="search" placeholder="搜索标题或诊断标签" />
+              <select id="sortSelect" class="select-input">
+                <option value="interactions">按互动排序</option>
+                <option value="impressions">按曝光排序</option>
+                <option value="views">按观看排序</option>
+                <option value="interactionRate">按互动率排序</option>
+                <option value="collectRate">按收藏率排序</option>
+                <option value="followRate">按转粉率排序</option>
+              </select>
+              <select id="chartMetricSelect" class="select-input">
+                <option value="interactions">累计互动</option>
+                <option value="views">累计观看</option>
+                <option value="impressions">累计曝光</option>
+                <option value="collects">累计收藏</option>
+                <option value="followersGained">累计涨粉</option>
+                <option value="interactionRate">互动率</option>
+                <option value="collectRate">收藏率</option>
+                <option value="followRate">转粉率</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="segmented" id="filterTabs">
+            <button class="active" data-filter="all" type="button">全部</button>
+            <button data-filter="fast" type="button">启动快</button>
+            <button data-filter="tail" type="button">后劲强</button>
+            <button data-filter="fade" type="button">衰减快</button>
+            <button data-filter="search" type="button">长尾流量</button>
+          </div>
+
+          <div class="chart-layout">
+            <div id="lifecycleChart" class="lifecycle-chart"></div>
+            <aside class="insight-panel">
+              <h3>判读重点</h3>
+              <ul id="insightList"></ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="content-card">
+          <div class="panel-head tight">
+            <div>
+              <h2>笔记表现矩阵</h2>
+              <p>勾选 2-4 篇笔记后，折线图只显示所选笔记。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="check-col"></th>
+                  <th>笔记</th>
+                  <th>生命周期判断</th>
+                  <th>24h互动</th>
+                  <th>14天互动</th>
+                  <th>24h占比</th>
+                  <th>7-14天增量</th>
+                  <th>曝光</th>
+                  <th>观看</th>
+                  <th>互动率</th>
+                  <th>收藏率</th>
+                </tr>
+              </thead>
+              <tbody id="notesBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/vendor/echarts/echarts.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

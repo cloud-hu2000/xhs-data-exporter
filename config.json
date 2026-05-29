@@ -1,0 +1,17 @@
+{
+  "debugPort": 9333,
+  "targetUrl": "https://creator.xiaohongshu.com/statistics/data-analysis",
+  "downloadDir": "./downloads",
+  "detailTexts": ["详情数据"],
+  "exportTexts": ["导出数据", "导出", "下载"],
+  "exportAllButtonsInDetail": true,
+  "closeTexts": ["关闭", "返回"],
+  "nextPageTexts": ["下一页", "下一页 >"],
+  "maxPages": 50,
+  "maxNotes": 500,
+  "slowMoMs": 600,
+  "pageReadyTimeoutMs": 30000,
+  "downloadTimeoutMs": 30000,
+  "afterExportWaitMs": 2500,
+  "headless": false
+}
