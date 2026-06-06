@@ -18,6 +18,8 @@ const defaults = {
   pageReadyTimeoutMs: 30000,
   downloadTimeoutMs: 30000,
   afterExportWaitMs: 2500,
+  exportRetryCount: 2,
+  exportRetryWaitMs: 5000,
   headless: false
 };
 
@@ -39,6 +41,12 @@ function loadConfig() {
   }
   if (process.env.XHS_EXPORT_ALL_BUTTONS) {
     config.exportAllButtonsInDetail = process.env.XHS_EXPORT_ALL_BUTTONS !== "false";
+  }
+  if (process.env.XHS_EXPORT_RETRY_COUNT) {
+    config.exportRetryCount = Number(process.env.XHS_EXPORT_RETRY_COUNT);
+  }
+  if (process.env.XHS_EXPORT_RETRY_WAIT_MS) {
+    config.exportRetryWaitMs = Number(process.env.XHS_EXPORT_RETRY_WAIT_MS);
   }
 
   config.downloadDir = path.resolve(projectRoot, config.downloadDir);

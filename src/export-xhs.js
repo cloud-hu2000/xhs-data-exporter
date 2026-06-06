@@ -13,6 +13,34 @@ const {
   safeFilename
 } = require("./playwright-utils");
 
+const projectRoot = path.resolve(__dirname, "..");
+const runStartedAt = new Date();
+const runLogPath = path.join(
+  projectRoot,
+  "logs",
+  `export-${runStartedAt.toISOString().replace(/[:.]/g, "-")}.log`
+);
+
+function logLine(level, args) {
+  const text = args
+    .map((arg) => {
+      if (arg instanceof Error) return arg.stack || arg.message;
+      if (typeof arg === "string") return arg;
+      return JSON.stringify(arg);
+    })
+    .join(" ");
+  fs.mkdirSync(path.dirname(runLogPath), { recursive: true });
+  fs.appendFileSync(runLogPath, `[${new Date().toISOString()}] [${level}] ${text}\n`, "utf8");
+}
+
+for (const level of ["log", "warn", "error"]) {
+  const original = console[level].bind(console);
+  console[level] = (...args) => {
+    logLine(level.toUpperCase(), args);
+    original(...args);
+  };
+}
+
 async function connectToBrowser(config) {
   try {
     return await chromium.connectOverCDP(`http://127.0.0.1:${config.debugPort}`);
@@ -34,6 +62,25 @@ function renameBrowserSavedFile(config, file, noteNumber, buttonNumber) {
   const target = uniqueDownloadTarget(config, noteNumber, buttonNumber, path.basename(file));
   fs.renameSync(file, target);
   return target;
+}
+
+function failedJsonDownload(file) {
+  if (!file || path.extname(file).toLowerCase() !== ".json") return null;
+  try {
+    const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (payload && payload.success === false) {
+      return payload.msg || payload.message || `code=${payload.code ?? "unknown"}`;
+    }
+  } catch (error) {
+    return `JSON parse failed: ${error.message}`;
+  }
+  return null;
+}
+
+function downloadResult(file) {
+  const reason = failedJsonDownload(file);
+  if (reason) return { ok: false, file, reason };
+  return { ok: true, file };
 }
 
 async function getWorkingPage(browser, config) {
@@ -61,7 +108,7 @@ async function getWorkingPage(browser, config) {
   return page;
 }
 
-async function clickOneExport(detailPage, config, noteNumber, buttonNumber, exportButton) {
+async function clickOneExportAttempt(detailPage, config, noteNumber, buttonNumber, exportButton) {
   const before = snapshotFiles(config.downloadDir);
   const downloadPromise = detailPage
     .waitForEvent("download", { timeout: config.downloadTimeoutMs })
@@ -76,6 +123,8 @@ async function clickOneExport(detailPage, config, noteNumber, buttonNumber, expo
     const target = uniqueDownloadTarget(config, noteNumber, buttonNumber, suggested);
     try {
       await download.saveAs(target);
+      const result = downloadResult(target);
+      if (!result.ok) return result;
       console.log(`  [${noteNumber}.${buttonNumber}] 已保存: ${target}`);
       return { ok: true, file: target };
     } catch (error) {
@@ -83,6 +132,8 @@ async function clickOneExport(detailPage, config, noteNumber, buttonNumber, expo
       const created = newFilesSince(config.downloadDir, before);
       if (created.length > 0) {
         const renamed = renameBrowserSavedFile(config, created[0], noteNumber, buttonNumber);
+        const result = downloadResult(renamed);
+        if (!result.ok) return result;
         console.log(`  [${noteNumber}.${buttonNumber}] 浏览器已保存并重命名: ${renamed}`);
         return { ok: true, file: renamed };
       }
@@ -94,12 +145,29 @@ async function clickOneExport(detailPage, config, noteNumber, buttonNumber, expo
   const created = newFilesSince(config.downloadDir, before);
   if (created.length > 0) {
     const renamed = renameBrowserSavedFile(config, created[0], noteNumber, buttonNumber);
+    const result = downloadResult(renamed);
+    if (!result.ok) return result;
     console.log(`  [${noteNumber}.${buttonNumber}] 检测到新文件并重命名: ${renamed}`);
     return { ok: true, file: renamed };
   }
 
   console.log(`  [${noteNumber}.${buttonNumber}] 已点击导出，但没有检测到下载文件。可能是页面创建了异步导出任务。`);
   return { ok: true, file: null };
+}
+
+async function clickOneExport(detailPage, config, noteNumber, buttonNumber, exportButton) {
+  const maxAttempts = Math.max(1, Number(config.exportRetryCount || 0) + 1);
+  let lastResult = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    lastResult = await clickOneExportAttempt(detailPage, config, noteNumber, buttonNumber, exportButton);
+    if (lastResult.ok) return lastResult;
+    console.log(`  [${noteNumber}.${buttonNumber}] export failed: ${lastResult.reason}`);
+    if (attempt < maxAttempts) {
+      console.log(`  [${noteNumber}.${buttonNumber}] retry after ${config.exportRetryWaitMs}ms`);
+      await sleep(config.exportRetryWaitMs);
+    }
+  }
+  return lastResult;
 }
 
 async function clickExports(detailPage, config, noteNumber) {
@@ -193,6 +261,8 @@ async function goNextPage(page, config) {
 
 async function main() {
   const config = loadConfig();
+  console.log(`Export run log: ${runLogPath}`);
+  console.log(`Retry config: count=${config.exportRetryCount}, waitMs=${config.exportRetryWaitMs}`);
   const browser = await connectToBrowser(config);
   const page = await getWorkingPage(browser, config);
 
@@ -201,6 +271,7 @@ async function main() {
 
   let exported = 0;
   let pageNo = 1;
+  const failures = [];
 
   while (pageNo <= config.maxPages && exported < config.maxNotes) {
     await sleep(config.slowMoMs);
@@ -215,7 +286,15 @@ async function main() {
 
     for (let i = 0; i < detailInfo.count && exported < config.maxNotes; i += 1) {
       exported += 1;
-      await exportNoteByIndex(page, config, detailInfo.text, i, exported);
+      const result = await exportNoteByIndex(page, config, detailInfo.text, i, exported);
+      const failedButtons = (result.results || []).filter((item) => !item.ok);
+      for (const failed of failedButtons) {
+        failures.push({
+          noteNumber: exported,
+          reason: failed.reason || "unknown",
+          file: failed.file || ""
+        });
+      }
       await sleep(config.slowMoMs);
     }
 
@@ -225,6 +304,12 @@ async function main() {
   }
 
   await browser.close();
+  if (failures.length > 0) {
+    console.log("Export failures:");
+    for (const failure of failures) {
+      console.log(`  note ${failure.noteNumber}: ${failure.reason} ${failure.file}`);
+    }
+  }
   console.log(`完成。共处理 ${exported} 条笔记。`);
 }
 

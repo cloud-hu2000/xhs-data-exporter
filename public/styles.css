@@ -399,6 +399,131 @@ select {
   font-weight: 700;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.publish-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  padding: 16px 18px 28px;
+}
+
+.funnel-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+.publish-heatmap {
+  min-width: 0;
+  width: 100%;
+  height: 540px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.funnel-chart {
+  min-width: 0;
+  width: 100%;
+  height: 430px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.publish-table-wrap {
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+}
+
+.funnel-table-wrap {
+  border-top: 1px solid var(--line);
+}
+
+.publish-table {
+  min-width: 920px;
+}
+
+.funnel-table {
+  min-width: 1040px;
+}
+
+.notes-compare-table {
+  min-width: 1680px;
+}
+
+.wide-select {
+  min-width: 280px;
+}
+
+.publish-table th,
+.publish-table td {
+  text-align: right;
+}
+
+.funnel-table th,
+.funnel-table td {
+  text-align: right;
+}
+
+.publish-table th:first-child,
+.publish-table td:first-child,
+.publish-table th:last-child,
+.publish-table td:last-child {
+  text-align: left;
+}
+
+.funnel-table th:first-child,
+.funnel-table td:first-child,
+.funnel-table th:last-child,
+.funnel-table td:last-child {
+  text-align: left;
+}
+
+.notes-compare-table th,
+.notes-compare-table td {
+  text-align: right;
+}
+
+.notes-compare-table th:first-child,
+.notes-compare-table td:first-child,
+.notes-compare-table th:nth-child(3),
+.notes-compare-table td:nth-child(3),
+.notes-compare-table th:nth-child(4),
+.notes-compare-table td:nth-child(4) {
+  text-align: left;
+}
+
+.notes-compare-table th:first-child,
+.notes-compare-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 var(--line);
+}
+
+.notes-compare-table th:first-child {
+  z-index: 3;
+  background: #f9fbfc;
+}
+
+.notes-tags {
+  max-width: 300px;
+}
+
+.funnel-table tbody tr {
+  cursor: pointer;
+}
+
+.funnel-table tbody tr:hover {
+  background: #f7fafc;
+}
+
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -468,12 +593,33 @@ select {
     min-width: 0;
   }
 
+  .publish-layout {
+    grid-template-columns: 1fr;
+    padding: 12px 12px 22px;
+    min-width: 0;
+  }
+
+  .funnel-layout {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    min-width: 0;
+  }
+
   .lifecycle-chart {
     height: 360px;
   }
 
+  .publish-heatmap {
+    height: 470px;
+  }
+
+  .funnel-chart {
+    height: 360px;
+  }
+
   .search-input,
-  .select-input {
+  .select-input,
+  .wide-select {
     width: 100%;
   }
 }

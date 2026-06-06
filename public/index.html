@@ -28,6 +28,14 @@
               <span class="menu-icon">↗</span>
               生命周期对比
             </button>
+            <button class="menu-item" type="button" data-view="publish">
+              <span class="menu-icon">#</span>
+              发布时间分析
+            </button>
+            <button class="menu-item" type="button" data-view="funnel">
+              <span class="menu-icon">▽</span>
+              漏斗分析
+            </button>
             <button class="menu-item" type="button" data-view="notes">
               <span class="menu-icon">≡</span>
               笔记横向表
@@ -73,7 +81,97 @@
           <div class="summary-meta" id="syncMeta">正在读取本地导出数据...</div>
         </section>
 
-        <section class="content-card">
+        <section class="content-card view-panel hidden" data-panel="funnel">
+          <div class="panel-head">
+            <div>
+              <h2>笔记漏斗分析</h2>
+              <p>把每篇笔记拆成曝光、观看、互动、收藏、涨粉五步，定位内容卡在哪一层。</p>
+            </div>
+            <div class="toolbar">
+              <select id="funnelNoteSelect" class="select-input wide-select"></select>
+            </div>
+          </div>
+
+          <div class="funnel-layout">
+            <div id="funnelChart" class="funnel-chart"></div>
+            <aside class="insight-panel">
+              <h3>自动诊断</h3>
+              <ul id="funnelInsightList"></ul>
+            </aside>
+          </div>
+
+          <div class="table-wrap funnel-table-wrap">
+            <table class="data-table funnel-table">
+              <thead>
+                <tr>
+                  <th>笔记</th>
+                  <th>曝光</th>
+                  <th>观看率</th>
+                  <th>互动率</th>
+                  <th>收藏率</th>
+                  <th>涨粉效率</th>
+                  <th>诊断</th>
+                </tr>
+              </thead>
+              <tbody id="funnelBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="content-card view-panel hidden" data-panel="notes">
+          <div class="panel-head">
+            <div>
+              <h2>笔记横向对比</h2>
+              <p>按关键指标横向比较每篇笔记，包含观看率、互动率、收藏率、转粉率、传播率等衍生指标。</p>
+            </div>
+            <div class="toolbar">
+              <input id="notesCompareSearch" class="search-input" type="search" placeholder="搜索标题、类型或标签" />
+              <select id="notesCompareSort" class="select-input">
+                <option value="impressions">按曝光排序</option>
+                <option value="views">按观看排序</option>
+                <option value="viewRate">按观看率排序</option>
+                <option value="interactionRate">按互动率排序</option>
+                <option value="collectRate">按收藏率排序</option>
+                <option value="followRate">按转粉率排序</option>
+                <option value="spreadRate">按传播率排序</option>
+                <option value="publishedAt">按发布时间排序</option>
+              </select>
+              <select id="notesCompareTag" class="select-input">
+                <option value="all">全部标签</option>
+              </select>
+              <button id="exportNotesReportBtn" class="button" type="button">导出报告</button>
+            </div>
+          </div>
+
+          <div class="table-wrap notes-compare-wrap">
+            <table class="data-table notes-compare-table">
+              <thead>
+                <tr>
+                  <th>标题</th>
+                  <th>发布时间</th>
+                  <th>类型</th>
+                  <th>标签</th>
+                  <th>曝光</th>
+                  <th>观看</th>
+                  <th>点击率</th>
+                  <th>平均观看时长</th>
+                  <th>点赞</th>
+                  <th>评论</th>
+                  <th>收藏</th>
+                  <th>分享</th>
+                  <th>涨粉</th>
+                  <th>互动率</th>
+                  <th>转粉率</th>
+                  <th>收藏率</th>
+                  <th>传播率</th>
+                </tr>
+              </thead>
+              <tbody id="notesCompareBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="content-card view-panel" data-panel="lifecycle">
           <div class="panel-head">
             <div>
               <h2>发布后时间轴</h2>
@@ -119,7 +217,47 @@
           </div>
         </section>
 
-        <section class="content-card">
+        <section class="content-card view-panel hidden" data-panel="publish">
+          <div class="panel-head">
+            <div>
+              <h2>发布策略分析</h2>
+              <p>按“星期几 x 小时”汇总笔记表现，观察发布时间段对曝光、互动和涨粉效率的影响。</p>
+            </div>
+            <div class="toolbar">
+              <select id="publishMetricSelect" class="select-input">
+                <option value="impressions">曝光表现</option>
+                <option value="interactions">互动表现</option>
+                <option value="followRate">涨粉效率</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="publish-layout">
+            <div id="publishHeatmapChart" class="publish-heatmap"></div>
+            <aside class="insight-panel">
+              <h3>发布时间建议</h3>
+              <ul id="publishInsightList"></ul>
+            </aside>
+          </div>
+
+          <div class="table-wrap publish-table-wrap">
+            <table class="data-table publish-table">
+              <thead>
+                <tr>
+                  <th>时间段</th>
+                  <th>笔记数</th>
+                  <th>平均曝光</th>
+                  <th>平均互动</th>
+                  <th>平均涨粉效率</th>
+                  <th>代表笔记</th>
+                </tr>
+              </thead>
+              <tbody id="publishSlotBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="content-card view-panel" data-panel="lifecycle">
           <div class="panel-head tight">
             <div>
               <h2>笔记表现矩阵</h2>

@@ -13,5 +13,7 @@
   "pageReadyTimeoutMs": 30000,
   "downloadTimeoutMs": 30000,
   "afterExportWaitMs": 2500,
+  "exportRetryCount": 2,
+  "exportRetryWaitMs": 5000,
   "headless": false
 }
