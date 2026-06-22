@@ -48,7 +48,7 @@ const MIN_DIAGNOSTIC_VIEWS = 100;
 const VIEW_META = {
   lifecycle: ["数据看板 / 生命周期对比", "笔记生命周期对比"],
   publish: ["数据看板 / 发布时间分析", "发布时间分析"],
-  funnel: ["数据看板 / 漏斗分析", "漏斗分析"],
+  funnel: ["数据看板 / 内容诊断", "分叉式内容诊断"],
   cover: ["数据看板 / 封面分析", "封面分析"],
   notes: ["数据看板 / 笔记横向对比", "笔记横向对比"]
 };
@@ -443,86 +443,22 @@ function formatPublishSlot(slot) {
 }
 
 function funnelRates(note) {
-  const impressions = note.impressions || 0;
-  const views = note.views || 0;
-  const interactions = note.interactions || 0;
-  const collects = note.collects || 0;
-  const followersGained = note.followersGained || 0;
-  return {
-    viewRate: impressions ? views / impressions : 0,
-    interactionRate: views ? interactions / views : 0,
-    collectRate: interactions ? collects / interactions : 0,
-    followRate: views ? followersGained / views : 0,
-    collectToFollowRate: collects ? followersGained / collects : 0,
-    commentToCollectRate: collects ? (note.comments || 0) / collects : (note.comments || 0),
-    impressions,
-    views,
-    interactions,
-    collects,
-    followersGained
-  };
+  return ContentDiagnostics.contentRates(note);
 }
 
 function funnelDiagnostics(note) {
-  const rates = funnelRates(note);
-  const comments = note.comments || 0;
-  const items = [];
-
-  if ((note.views || 0) < MIN_DIAGNOSTIC_VIEWS) {
-    return [{
-      type: "! 样本不足",
-      detail: `当前观看数 ${formatNumber(note.views || 0)}，低于 ${formatNumber(MIN_DIAGNOSTIC_VIEWS)}，比例容易失真，暂不做强诊断。`
-    }];
-  }
-
-  if (rates.impressions >= 800 && rates.viewRate < 0.1) {
-    items.push({
-      type: "高曝光低点击",
-      detail: "封面/标题可能弱，建议优先测试标题钩子和封面信息密度。"
-    });
-  }
-  if (rates.viewRate >= 0.12 && rates.interactionRate < 0.04) {
-    items.push({
-      type: "高观看低互动",
-      detail: "内容有吸引力但共鸣不足，可以增加观点、问题或行动引导。"
-    });
-  }
-  if (rates.collectRate >= 0.35 && rates.collectToFollowRate < 0.08 && rates.collects >= 3) {
-    items.push({
-      type: "高收藏低涨粉",
-      detail: "工具性强，但账号人设承接弱，结尾可以强化账号价值和关注理由。"
-    });
-  }
-  if (comments >= 2 && rates.collectRate < 0.25 && comments >= rates.collects) {
-    items.push({
-      type: "高评论低收藏",
-      detail: "话题争议强，但实用价值不足，适合补清单、步骤或可保存结论。"
-    });
-  }
-  if (rates.viewRate >= 0.12 && rates.followRate >= 0.004 && rates.followersGained > 0) {
-    items.push({
-      type: "高观看高涨粉",
-      detail: "值得复刻，优先保留选题角度、开头结构和承接方式。"
-    });
-  }
-  if (items.length === 0) {
-    items.push({
-      type: "待观察",
-      detail: "当前漏斗没有明显断点，可以继续积累样本后再判断。"
-    });
-  }
-  return items;
+  return ContentDiagnostics.contentDiagnostics(note);
 }
 
 function funnelSteps(note) {
   const rates = funnelRates(note);
-  return [
-    { name: "曝光", value: rates.impressions, rate: 1 },
-    { name: "观看", value: rates.views, rate: rates.viewRate },
-    { name: "互动", value: rates.interactions, rate: rates.views ? rates.interactions / rates.views : 0 },
-    { name: "收藏", value: rates.collects, rate: rates.interactions ? rates.collects / rates.interactions : 0 },
-    { name: "涨粉", value: rates.followersGained, rate: rates.views ? rates.followersGained / rates.views : 0 }
-  ];
+  return {
+    entry: [
+      { key: "impressions", name: "曝光", value: rates.impressions, rate: 1 },
+      { key: "views", name: "观看", value: rates.views, rate: rates.viewRate }
+    ],
+    branches: ContentDiagnostics.behaviorBranches(note)
+  };
 }
 
 function selectedFunnelNote() {
@@ -1158,43 +1094,111 @@ function renderFunnelChart() {
   const note = selectedFunnelNote();
   if (!note) return;
   const steps = funnelSteps(note);
-  const max = Math.max(1, steps[0].value || 0);
+  const entry = steps.entry;
+  const branches = steps.branches;
+  const nodeColors = {
+    impressions: "#2374d5",
+    views: "#4f9f8f",
+    likes: "#db6b6b",
+    comments: "#8d72c7",
+    collects: "#e0a533",
+    shares: "#3f94c7",
+    followersGained: "#c73535"
+  };
+  const branchPositions = [90, 255, 420, 585, 750];
+  const nodes = [
+    {
+      ...entry[0],
+      x: 420,
+      y: 35,
+      symbolSize: [150, 64],
+      itemStyle: { color: nodeColors.impressions }
+    },
+    {
+      ...entry[1],
+      x: 420,
+      y: 155,
+      symbolSize: [150, 64],
+      itemStyle: { color: nodeColors.views }
+    },
+    ...branches.map((branch, index) => ({
+      ...branch,
+      x: branchPositions[index],
+      y: 320,
+      symbolSize: [128, 62],
+      itemStyle: { color: nodeColors[branch.key] }
+    }))
+  ];
+  const links = [
+    {
+      source: "曝光",
+      target: "观看",
+      rate: entry[1].rate,
+      label: `观看曝光比 ${formatPct(entry[1].rate)}`
+    },
+    ...branches.map((branch) => ({
+      source: "观看",
+      target: branch.name,
+      rate: branch.rate,
+      label: formatPct(branch.rate)
+    }))
+  ];
 
   state.funnelChart.setOption({
-    color: ["#2374d5", "#4f9f8f", "#f2c45b", "#c96f3d", "#c73535"],
     tooltip: {
       trigger: "item",
       formatter: (params) => {
-        const step = steps.find((item) => item.name === params.name);
-        const rateText = step.name === "曝光" ? "起点" : `上一步转化：${formatPct(step.rate)}`;
-        return `${params.name}<br/>数量：${formatNumber(step.value)}<br/>${rateText}`;
+        if (params.dataType === "edge") {
+          const label = params.data.source === "曝光" ? "入口转化" : "观看后行为率";
+          return `${params.data.source} → ${params.data.target}<br/>${label}：${formatPct(params.data.rate)}`;
+        }
+        const node = nodes.find((item) => item.name === params.name);
+        const rateText = node.key === "impressions"
+          ? "分发入口"
+          : node.key === "views"
+            ? `观看曝光比：${formatPct(node.rate)}`
+            : `占观看数：${formatPct(node.rate)}`;
+        return `${params.name}<br/>数量：${formatNumber(node.value)}<br/>${rateText}`;
       }
     },
     series: [{
-      type: "funnel",
-      left: "8%",
-      top: 28,
-      bottom: 28,
-      width: "84%",
-      min: 0,
-      max,
-      sort: "none",
-      gap: 4,
+      type: "graph",
+      layout: "none",
+      left: "4%",
+      right: "4%",
+      top: 24,
+      bottom: 24,
+      roam: false,
+      symbol: "roundRect",
       label: {
         show: true,
-        position: "inside",
-        formatter: (params) => `${params.name}\n${formatNumber(params.data.rawValue)}`
+        color: "#fff",
+        fontWeight: 700,
+        lineHeight: 19,
+        formatter: (params) => {
+          const node = params.data;
+          const suffix = node.key === "impressions"
+            ? `\n${formatNumber(node.value)}`
+            : node.key === "views"
+              ? `\n${formatNumber(node.value)} · ${formatPct(node.rate)}`
+              : `\n${formatNumber(node.value)} · ${formatPct(node.rate)}`;
+          return `${node.name}${suffix}`;
+        }
       },
-      labelLine: { show: false },
-      itemStyle: {
-        borderColor: "#fff",
-        borderWidth: 1
+      edgeLabel: {
+        show: true,
+        color: "#697684",
+        fontSize: 11,
+        formatter: (params) => params.data.label
       },
-      data: steps.map((step) => ({
-        name: step.name,
-        value: Math.max(step.value, max * 0.015),
-        rawValue: step.value
-      }))
+      lineStyle: {
+        color: "#aab7c4",
+        width: 2,
+        curveness: 0.05
+      },
+      emphasis: { focus: "adjacency" },
+      data: nodes,
+      links
     }]
   }, true);
 }
@@ -1209,10 +1213,16 @@ function renderFunnelInsights() {
   }
   const rates = funnelRates(note);
   const diagnostics = funnelDiagnostics(note);
+  const retention = [
+    rates.hasTwoSecondExitRate && `2 秒退出率 ${formatPct(rates.twoSecondExitRate)}`,
+    rates.hasCompletionRate && `完播率 ${formatPct(rates.completionRate)}`
+  ].filter(Boolean);
   const items = [
-    `观看曝光比 ${formatPct(rates.viewRate)}，互动率 ${formatPct(rates.interactionRate)}，收藏/互动 ${formatPct(rates.collectRate)}，涨粉效率 ${formatPct(rates.followRate)}。`,
+    `入口：观看曝光比 ${formatPct(rates.viewRate)}${rates.officialCoverClickRate == null ? "" : `，官方封面点击率 ${formatPct(rates.officialCoverClickRate)}`}。`,
+    `观看后行为：点赞 ${formatPct(rates.likeRate)}，评论 ${formatPct(rates.commentRate)}，收藏 ${formatPct(rates.collectRate)}，分享 ${formatPct(rates.shareRate)}，关注 ${formatPct(rates.followRate)}。`,
+    retention.length > 0 && `留存信号：${retention.join("，")}。`,
     ...diagnostics.map((item) => `${item.type}：${item.detail}`)
-  ];
+  ].filter(Boolean);
   list.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
 
@@ -1242,9 +1252,11 @@ function renderFunnelTable() {
         <td><div class="note-title">${note.title}</div></td>
         <td><div class="metric-main">${formatNumber(record.impressions)}</div></td>
         <td><div class="metric-main">${formatPct(record.viewRate)}</div><div class="metric-sub">${formatNumber(record.views)} 观看</div></td>
-        <td><div class="metric-main">${formatPct(record.interactionRate)}</div><div class="metric-sub">${formatNumber(record.interactions)} 互动</div></td>
+        <td><div class="metric-main">${formatPct(record.likeRate)}</div><div class="metric-sub">${formatNumber(record.likes)} 点赞</div></td>
+        <td><div class="metric-main">${formatPct(record.commentRate)}</div><div class="metric-sub">${formatNumber(record.comments)} 评论</div></td>
         <td><div class="metric-main">${formatPct(record.collectRate)}</div><div class="metric-sub">${formatNumber(record.collects)} 收藏</div></td>
-        <td><div class="metric-main">${formatPct(record.followRate)}</div><div class="metric-sub">${formatNumber(record.followersGained)} 涨粉</div></td>
+        <td><div class="metric-main">${formatPct(record.shareRate)}</div><div class="metric-sub">${formatNumber(record.shares)} 分享</div></td>
+        <td><div class="metric-main">${formatPct(record.followRate)}</div><div class="metric-sub">${formatNumber(record.followersGained)} 关注</div></td>
         <td>
           <div class="tags">
             ${diagnostics.map((item) => `<span class="tag ${tagClass(item.type)}">${item.type}</span>`).join("")}

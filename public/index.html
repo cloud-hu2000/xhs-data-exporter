@@ -30,7 +30,7 @@
             </button>
             <button class="menu-item" type="button" data-view="funnel">
               <span class="menu-icon">▽</span>
-              漏斗分析
+              内容诊断
             </button>
             <button class="menu-item" type="button" data-view="cover">
               <span class="menu-icon">▣</span>
@@ -101,8 +101,8 @@
         <section class="content-card view-panel hidden" data-panel="funnel">
           <div class="panel-head">
             <div>
-              <h2>笔记漏斗分析</h2>
-              <p>把每篇笔记拆成曝光、观看、互动、收藏、涨粉五步，定位内容卡在哪一层。</p>
+              <h2>分叉式内容诊断</h2>
+              <p>曝光先转化为观看；点赞、评论、收藏、分享和关注均是观看后的独立行为，不互为必经步骤。</p>
             </div>
             <div class="toolbar">
               <select id="funnelNoteSelect" class="select-input wide-select"></select>
@@ -124,9 +124,11 @@
                   <th data-table="funnel" data-sort-key="title">笔记</th>
                   <th data-table="funnel" data-sort-key="impressions">曝光</th>
                   <th data-table="funnel" data-sort-key="viewRate">观看曝光比</th>
-                  <th data-table="funnel" data-sort-key="interactionRate">互动率</th>
+                  <th data-table="funnel" data-sort-key="likeRate">点赞率</th>
+                  <th data-table="funnel" data-sort-key="commentRate">评论率</th>
                   <th data-table="funnel" data-sort-key="collectRate">收藏率</th>
-                  <th data-table="funnel" data-sort-key="followRate">涨粉效率</th>
+                  <th data-table="funnel" data-sort-key="shareRate">分享率</th>
+                  <th data-table="funnel" data-sort-key="followRate">关注率</th>
                   <th data-table="funnel" data-sort-key="diagnosis">诊断</th>
                 </tr>
               </thead>
@@ -362,6 +364,7 @@
     </div>
 
     <script src="/vendor/echarts/echarts.min.js"></script>
+    <script src="./content-diagnostics.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
