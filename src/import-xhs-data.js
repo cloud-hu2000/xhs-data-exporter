@@ -10,7 +10,6 @@ const coverManifestPath = path.join(dataDir, "note-covers.json");
 
 const BASIC_OVERVIEW = "基础数据总览";
 const INTERACTION_OVERVIEW = "互动数据总览";
-const MIN_DIAGNOSTIC_VIEWS = 100;
 const REQUIRED_FIELDS = {
   basic: ["曝光数", "观看数"],
   interaction: ["点赞数", "评论数", "收藏数", "分享数"]
@@ -211,22 +210,6 @@ function derivedMetrics(note) {
   };
 }
 
-function diagnosisFor(note) {
-  const tags = [];
-  if ((note.views || 0) < MIN_DIAGNOSTIC_VIEWS) {
-    return ["! 样本不足"];
-  }
-  if ((note.impressions || 0) >= 1000 && (note.viewRate || 0) < 0.1) tags.push("高曝光低点击");
-  if ((note.viewRate || 0) >= 0.15) tags.push("封面/标题有效");
-  if ((note.collectRate || 0) >= 0.04) tags.push("高收藏价值");
-  if ((note.commentRate || 0) >= 0.01) tags.push("高讨论");
-  if ((note.followRate || 0) >= 0.004) tags.push("转粉效率好");
-  if ((note.interactionRate || 0) >= 0.08) tags.push("高互动");
-  if ((note.impressions || 0) < 800 && (note.interactionRate || 0) >= 0.08) tags.push("潜力笔记");
-  if (tags.length === 0) tags.push("待观察");
-  return tags;
-}
-
 function latestFiles(files) {
   const chosen = new Map();
   const skipped = [];
@@ -377,7 +360,7 @@ function importData() {
           coverCapturedAt: cover.capturedAt || ""
         });
       }
-      enriched.diagnosis = diagnosisFor(enriched);
+      enriched.diagnosis = [];
       enriched.firstMetricDate = dailyMetrics
         .filter((row) => row.noteKey === note.noteKey)
         .map((row) => row.bucket)

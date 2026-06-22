@@ -11,6 +11,9 @@ const state = {
   notesCompareSearch: "",
   notesCompareSort: "cesScore",
   notesCompareTag: "all",
+  reviewNoteKey: "",
+  reviewDraft: null,
+  benchmarkCache: new Map(),
   tables: {
     lifecycle: { page: 1, pageSize: 10, sortKey: "m14", sortDir: "desc" },
     publish: { page: 1, pageSize: 10, sortKey: "avgImpressions", sortDir: "desc" },
@@ -43,7 +46,15 @@ const PUBLISH_METRIC_LABELS = {
   interactions: "平均互动",
   followRate: "平均涨粉效率"
 };
-const MIN_DIAGNOSTIC_VIEWS = 100;
+const REVIEW_FIELD_META = {
+  contentTypes: "内容类型",
+  formats: "形式",
+  hooks: "核心钩子",
+  coverStyles: "封面风格",
+  firstFiveSecondStructures: "前 5 秒结构",
+  targetActions: "目标动作",
+  audiences: "目标人群"
+};
 
 const VIEW_META = {
   lifecycle: ["数据看板 / 生命周期对比", "笔记生命周期对比"],
@@ -90,7 +101,7 @@ function escapeHtml(value) {
 }
 
 function tagClass(label) {
-  if (String(label).includes("样本不足")) return "warning";
+  if (String(label).includes("样本不足") || String(label).includes("基准积累")) return "warning";
   if (label === "待观察") return "";
   return "strong";
 }
@@ -282,7 +293,7 @@ function formatLifecycleValue(value, status, formatter = formatNumber, rawValue 
   return `<div class="metric-main">${formatter(value)}</div>`;
 }
 
-function lifecycleProfile(note) {
+function lifecycleValues(note) {
   const m24 = milestoneValue(note.noteKey, "24h", "interactions");
   const m7 = milestoneValue(note.noteKey, "7d", "interactions");
   const m14 = milestoneValue(note.noteKey, "14d", "interactions");
@@ -300,33 +311,60 @@ function lifecycleProfile(note) {
   const tailShare = hasM7 && hasM14 && m14 ? Math.max(0, m14 - m7) / m14 : null;
   const firstDayViewRate = isCompleteValue(firstDayViews) && isCompleteValue(firstDayImpressions) && firstDayImpressions ? firstDayViews / firstDayImpressions : null;
 
-  const tags = [];
-  if (!hasM24 || !hasM7 || !hasM14) {
-    tags.push("数据未完整");
-  } else {
-    if (m24 >= 20 || earlyShare >= 0.45) tags.push("启动快");
-    if (tailShare >= 0.18) tags.push("后劲强");
-    if (earlyShare >= 0.72 && tailShare <= 0.08) tags.push("衰减快");
-    if (tailShare >= 0.12 && firstDayViewRate >= 0.12) tags.push("长尾流量");
-    if (tags.length === 0) tags.push("待观察");
-  }
-
   return {
-    tags,
     m24,
     m7,
     m14,
     m24Raw,
     m7Raw,
     m14Raw,
-    m24Display: milestoneDisplayValue(note.noteKey, "24h", "interactions"),
-    m7Display: milestoneDisplayValue(note.noteKey, "7d", "interactions"),
-    m14Display: milestoneDisplayValue(note.noteKey, "14d", "interactions"),
     views14,
     impressions14,
     earlyShare,
     tailShare,
     firstDayViewRate,
+    hasM24,
+    hasM7,
+    hasM14
+  };
+}
+
+function lifecycleProfile(note) {
+  const values = lifecycleValues(note);
+  const tags = [];
+  if (!values.hasM24 || !values.hasM7 || !values.hasM14) {
+    tags.push("数据未完整");
+  } else {
+    const cohort = ContentDiagnostics.selectPeerCohort(state.data.notes, note);
+    const peerValues = cohort.notes.map(lifecycleValues);
+    const stats = {
+      m24: ContentDiagnostics.metricStats(peerValues.map((item) => item.m24).filter(isCompleteValue)),
+      earlyShare: ContentDiagnostics.metricStats(peerValues.map((item) => item.earlyShare).filter(isCompleteValue)),
+      tailShare: ContentDiagnostics.metricStats(peerValues.map((item) => item.tailShare).filter(isCompleteValue)),
+      firstDayViewRate: ContentDiagnostics.metricStats(peerValues.map((item) => item.firstDayViewRate).filter(isCompleteValue))
+    };
+    const sufficient = cohort.notes.length >= ContentDiagnostics.BENCHMARK_CONFIG.minimumPeers;
+    if (!sufficient) {
+      tags.push("基准积累中");
+    } else {
+      const m24Comparison = ContentDiagnostics.compareMetric(values.m24, stats.m24, "high");
+      const earlyComparison = ContentDiagnostics.compareMetric(values.earlyShare, stats.earlyShare, "high");
+      const tailComparison = ContentDiagnostics.compareMetric(values.tailShare, stats.tailShare, "high");
+      const firstDayComparison = ContentDiagnostics.compareMetric(values.firstDayViewRate, stats.firstDayViewRate, "high");
+      if (m24Comparison?.band === "high" || earlyComparison?.band === "high") tags.push("启动速度同类前 25%");
+      if (tailComparison?.band === "high") tags.push("后劲同类前 25%");
+      if (earlyComparison?.band === "high" && tailComparison?.band === "low") tags.push("前高后低");
+      if (tailComparison?.band === "high" && firstDayComparison?.band === "high") tags.push("长尾表现突出");
+      if (tags.length === 0) tags.push("处于同类正常区间");
+    }
+  }
+
+  return {
+    tags,
+    ...values,
+    m24Display: milestoneDisplayValue(note.noteKey, "24h", "interactions"),
+    m7Display: milestoneDisplayValue(note.noteKey, "7d", "interactions"),
+    m14Display: milestoneDisplayValue(note.noteKey, "14d", "interactions"),
     m24Status: milestoneStatus(note.noteKey, "24h", "interactions"),
     m7Status: milestoneStatus(note.noteKey, "7d", "interactions"),
     m14Status: milestoneStatus(note.noteKey, "14d", "interactions")
@@ -335,10 +373,10 @@ function lifecycleProfile(note) {
 
 function noteMatchesFilter(note) {
   const tags = lifecycleProfile(note).tags;
-  if (state.filter === "fast") return tags.includes("启动快");
-  if (state.filter === "tail") return tags.includes("后劲强");
-  if (state.filter === "fade") return tags.includes("衰减快");
-  if (state.filter === "search") return tags.includes("长尾流量");
+  if (state.filter === "fast") return tags.includes("启动速度同类前 25%");
+  if (state.filter === "tail") return tags.includes("后劲同类前 25%");
+  if (state.filter === "fade") return tags.includes("前高后低");
+  if (state.filter === "search") return tags.includes("长尾表现突出");
   return true;
 }
 
@@ -348,7 +386,7 @@ function filteredNotes() {
     .filter(noteMatchesFilter)
     .filter((note) => {
       if (!query) return true;
-      return `${note.title} ${note.diagnosis.join(" ")} ${lifecycleProfile(note).tags.join(" ")}`.toLowerCase().includes(query);
+      return `${note.title} ${funnelDiagnostics(note).map((item) => item.type).join(" ")} ${lifecycleProfile(note).tags.join(" ")}`.toLowerCase().includes(query);
     })
     .sort((a, b) => Number(b[state.sort] || 0) - Number(a[state.sort] || 0));
 }
@@ -446,8 +484,18 @@ function funnelRates(note) {
   return ContentDiagnostics.contentRates(note);
 }
 
+function benchmarkFor(note) {
+  if (!state.benchmarkCache.has(note.noteKey)) {
+    state.benchmarkCache.set(
+      note.noteKey,
+      ContentDiagnostics.buildRelativeBenchmark(state.data.notes, note)
+    );
+  }
+  return state.benchmarkCache.get(note.noteKey);
+}
+
 function funnelDiagnostics(note) {
-  return ContentDiagnostics.contentDiagnostics(note);
+  return ContentDiagnostics.contentDiagnostics(note, benchmarkFor(note));
 }
 
 function funnelSteps(note) {
@@ -468,13 +516,29 @@ function selectedFunnelNote() {
   return state.data.notes.find((note) => note.noteKey === state.funnelNoteKey) || state.data.notes[0];
 }
 
-function noteContentType(note) {
-  if ((note.views || 0) < MIN_DIAGNOSTIC_VIEWS) return "样本不足";
-  if ((note.collectRate || 0) >= 0.04 || (note.collects || 0) >= 20) return "工具/资料";
-  if ((note.commentRate || 0) >= 0.01 || (note.comments || 0) >= 2) return "观点/讨论";
-  if ((note.followRate || 0) >= 0.004 || (note.followersGained || 0) > 0) return "涨粉型";
-  if ((note.viewRate || 0) >= 0.15) return "点击型";
-  return "常规笔记";
+function emptyReview() {
+  return {
+    ...Object.fromEntries(Object.keys(REVIEW_FIELD_META).map((field) => [field, []])),
+    videoDurationSeconds: 0,
+    seriesName: "",
+    firstFiveSecondsNote: "",
+    endingCtaNote: "",
+    notes: "",
+    isTrendTracking: false,
+    hasPersonOnCamera: false,
+    hasFollowCta: false
+  };
+}
+
+function reviewLabels(review) {
+  if (!review) return [];
+  return [
+    ...Object.keys(REVIEW_FIELD_META).flatMap((field) => review[field] || []),
+    review.seriesName && `系列：${review.seriesName}`,
+    review.isTrendTracking && "热点追踪",
+    review.hasPersonOnCamera && "真人出镜",
+    review.hasFollowCta && "有关注引导"
+  ].filter(Boolean);
 }
 
 function cesScoreFor(note) {
@@ -496,7 +560,9 @@ function noteCompareRecord(note) {
   const interactions = likes + comments + collects + shares;
   const publishedAt = inferredPublishDate(note);
   const funnelTags = funnelDiagnostics(note).map((item) => item.type);
-  const labels = [...new Set([...(note.diagnosis || []), ...funnelTags])];
+  const manualLabels = reviewLabels(note.review);
+  const labels = [...new Set([...manualLabels, ...funnelTags])];
+  const contentTypes = note.review?.contentTypes || [];
 
   return {
     note,
@@ -508,8 +574,15 @@ function noteCompareRecord(note) {
       hour: "2-digit",
       minute: "2-digit"
     }) : note.firstMetricDate || "-",
-    type: noteContentType(note),
+    type: contentTypes.length > 0 ? contentTypes.join(" / ") : "未标注",
     labels,
+    review: note.review,
+    formats: note.review?.formats || [],
+    hooks: note.review?.hooks || [],
+    coverStyles: note.review?.coverStyles || [],
+    firstFiveSecondStructures: note.review?.firstFiveSecondStructures || [],
+    targetActions: note.review?.targetActions || [],
+    audiences: note.review?.audiences || [],
     impressions,
     views,
     officialCoverClickRate: officialCoverClickRate(note),
@@ -560,19 +633,39 @@ function coverRecord(note) {
   const coverClicks = officialRate == null ? null : Math.round(impressions * officialRate);
   const interactionRate = note.interactionRate || 0;
   const collectRate = note.collectRate || 0;
+  const benchmark = benchmarkFor(note);
+  const rates = funnelRates(note);
+  const entryMetric = officialRate != null
+    && benchmark.metrics.officialCoverClickRate?.count >= ContentDiagnostics.BENCHMARK_CONFIG.minimumPeers
+    ? "officialCoverClickRate"
+    : "viewRate";
+  const entryComparison = ContentDiagnostics.compareMetric(
+    rates[entryMetric],
+    benchmark.metrics[entryMetric],
+    "high"
+  );
+  const exposureComparison = ContentDiagnostics.compareMetric(
+    impressions,
+    benchmark.metrics.impressions,
+    "high"
+  );
+  const interactionComparison = ContentDiagnostics.compareMetric(
+    interactionRate,
+    benchmark.metrics.interactionRate,
+    "high"
+  );
   const diagnostics = [];
-  const smallSample = views < MIN_DIAGNOSTIC_VIEWS;
 
-  if (smallSample) {
-    diagnostics.push("! 样本不足");
+  if (!benchmark.sufficient) {
+    diagnostics.push("基准积累中");
   } else {
-    if (officialRate != null && impressions >= 800 && officialRate < 0.1) diagnostics.push("高曝光低点击");
-    if (officialRate != null && officialRate >= 0.15) diagnostics.push("封面吸引力强");
-    if (officialRate != null && officialRate >= 0.12 && interactionRate < 0.04) diagnostics.push("点击强内容弱");
-    if (officialRate != null && officialRate < 0.08 && interactionRate >= 0.08) diagnostics.push("内容潜力大");
+    if (entryComparison?.band === "high") diagnostics.push("入口转化同类前 25%");
+    if (exposureComparison?.band === "high" && entryComparison?.band === "low") diagnostics.push("分发高但入口偏弱");
+    if (entryComparison?.band === "high" && interactionComparison?.band === "low") diagnostics.push("入口强内容承接弱");
+    if (entryComparison?.band === "low" && interactionComparison?.band === "high") diagnostics.push("入口偏弱内容潜力高");
     if (officialRate == null) diagnostics.push("缺少官方封面点击率");
   }
-  if (diagnostics.length === 0) diagnostics.push("待观察");
+  if (diagnostics.length === 0) diagnostics.push("处于同类正常区间");
 
   return {
     note,
@@ -588,7 +681,10 @@ function coverRecord(note) {
     views,
     interactionRate,
     collectRate,
-    smallSample,
+    benchmark,
+    entryMetric,
+    entryComparison,
+    entryRelative: entryComparison?.relativeToMedian ?? null,
     diagnostics,
     diagnosticsText: diagnostics.join(" ")
   };
@@ -658,19 +754,18 @@ function renderCoverInsights() {
   if (!list) return;
   const rows = coverRecords();
   const rowsWithOfficialRate = rows.filter((row) => row.officialCoverClickRate != null);
-  const officialRows = rowsWithOfficialRate.filter((row) => !row.smallSample);
-  const best = officialRows[0];
-  const weak = [...officialRows].filter((row) => row.impressions >= 800).sort((a, b) => a.officialCoverClickRate - b.officialCoverClickRate)[0];
-  const avgRate = officialRows.length ? officialRows.reduce((sum, row) => sum + row.officialCoverClickRate, 0) / officialRows.length : 0;
+  const comparableRows = rows.filter((row) => row.benchmark.sufficient && row.entryRelative != null);
+  const best = [...comparableRows].sort((a, b) => b.entryRelative - a.entryRelative)[0];
+  const weak = comparableRows.find((row) => row.diagnostics.includes("分发高但入口偏弱"));
   const withImageCount = rows.filter((row) => row.coverImageUrl).length;
-  const smallSampleCount = rows.filter((row) => row.smallSample).length;
+  const accumulatingCount = rows.filter((row) => !row.benchmark.sufficient).length;
   const items = [
-    best && `当前官方封面点击率最高：${shortTitle(best.title)}，${formatPct(best.officialCoverClickRate)}，曝光 ${formatNumber(best.impressions)}。`,
-    weak && weak !== best && `高曝光低点击优先复盘：${shortTitle(weak.title)}，官方封面点击率 ${formatPct(weak.officialCoverClickRate)}，适合先改封面/标题钩子。`,
-    officialRows.length
-      ? `样本平均官方封面点击率 ${formatPct(avgRate)}；观看曝光比单独展示，不再替代平台原始字段。`
-      : (rowsWithOfficialRate.length ? "当前有官方封面点击率，但有效样本观看数不足，暂不生成封面强判断。" : "当前数据缺少平台原始封面点击率；请重新导入包含该字段的基础数据明细表。"),
-    smallSampleCount > 0 && `${formatNumber(smallSampleCount)} 篇笔记观看数低于 ${formatNumber(MIN_DIAGNOSTIC_VIEWS)}，已标记样本不足并暂停强诊断。`,
+    best && `相对同类入口表现最好：${shortTitle(best.title)}，${best.entryMetric === "officialCoverClickRate" ? "官方封面点击率" : "观看曝光比"}比其基准中位数高 ${Math.max(0, best.entryRelative * 100).toFixed(0)}%。`,
+    weak && `分发高但入口偏弱：${shortTitle(weak.title)}，比${weak.benchmark.label}的入口中位数低 ${Math.abs(weak.entryRelative * 100).toFixed(0)}%，优先复盘封面和标题。`,
+    rowsWithOfficialRate.length
+      ? "官方封面点击率优先与同系列或同类内容比较；缺少足够同类样本时回退到最近 30 篇。"
+      : "当前数据缺少平台原始封面点击率，暂用观看曝光比做账号内相对比较。",
+    accumulatingCount > 0 && `${formatNumber(accumulatingCount)} 篇内容的可比历史不足，暂只展示数据，不输出强结论。`,
     withImageCount ? `已匹配到 ${formatNumber(withImageCount)} 张封面图，可直接做视觉对比。` : "当前旧数据还没有封面图；重新运行导出后会尝试从详情页记录封面 URL。"
   ].filter(Boolean);
   list.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
@@ -846,11 +941,11 @@ function renderInsights() {
   const tailProfile = strongestTail ? lifecycleProfile(strongestTail) : null;
 
   const items = [
-    fastest && `启动最快：${shortTitle(fastest.title)}，24小时互动 ${formatNumber(fastestProfile.m24)}。`,
-    strongestTail && `后劲最强：${shortTitle(strongestTail.title)}，7-14天互动增量占比 ${formatPct(tailProfile.tailShare)}。`,
+    fastest && `账号内 24 小时互动最高：${shortTitle(fastest.title)}，${formatNumber(fastestProfile.m24)}。`,
+    strongestTail && `账号内长尾增量占比最高：${shortTitle(strongestTail.title)}，7-14 天增量占比 ${formatPct(tailProfile.tailShare)}。`,
     (!fastest || !strongestTail) && "部分笔记的时间序列窗口未完整覆盖，已停止参与生命周期判断。",
     "曝光/观看的 1小时、6小时数据官方导出未提供，早期判断优先看互动、收藏、评论、涨粉。",
-    "曲线前段陡说明启动快；后段继续上扬说明有长尾搜索或持续推荐。"
+    "生命周期标签按同系列、同类内容或最近 30 篇的四分位判断，不使用固定互动数或固定比例。"
   ].filter(Boolean);
 
   document.getElementById("insightList").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
@@ -1212,12 +1307,14 @@ function renderFunnelInsights() {
     return;
   }
   const rates = funnelRates(note);
+  const benchmark = benchmarkFor(note);
   const diagnostics = funnelDiagnostics(note);
   const retention = [
     rates.hasTwoSecondExitRate && `2 秒退出率 ${formatPct(rates.twoSecondExitRate)}`,
     rates.hasCompletionRate && `完播率 ${formatPct(rates.completionRate)}`
   ].filter(Boolean);
   const items = [
+    `比较基准：${benchmark.label}，可比样本 ${benchmark.peerCount} 篇${benchmark.sufficient ? "" : "（仍在积累）"}。`,
     `入口：观看曝光比 ${formatPct(rates.viewRate)}${rates.officialCoverClickRate == null ? "" : `，官方封面点击率 ${formatPct(rates.officialCoverClickRate)}`}。`,
     `观看后行为：点赞 ${formatPct(rates.likeRate)}，评论 ${formatPct(rates.commentRate)}，收藏 ${formatPct(rates.collectRate)}，分享 ${formatPct(rates.shareRate)}，关注 ${formatPct(rates.followRate)}。`,
     retention.length > 0 && `留存信号：${retention.join("，")}。`,
@@ -1284,6 +1381,139 @@ function renderFunnelAnalysis() {
   renderFunnelTable();
 }
 
+function selectedReviewNote() {
+  if (!state.reviewNoteKey || !state.data.notes.some((note) => note.noteKey === state.reviewNoteKey)) {
+    state.reviewNoteKey = state.data.notes[0]?.noteKey || "";
+  }
+  return state.data.notes.find((note) => note.noteKey === state.reviewNoteKey) || null;
+}
+
+function resetReviewDraft() {
+  const note = selectedReviewNote();
+  state.reviewDraft = {
+    ...emptyReview(),
+    ...(note?.review || {}),
+    ...Object.fromEntries(Object.keys(REVIEW_FIELD_META).map((field) => [
+      field,
+      [...(note?.review?.[field] || [])]
+    ]))
+  };
+}
+
+function syncReviewDraftFromForm() {
+  if (!state.reviewDraft) return;
+  const value = (id) => document.getElementById(id)?.value || "";
+  state.reviewDraft.videoDurationSeconds = Number(value("reviewVideoDuration")) || 0;
+  state.reviewDraft.seriesName = value("reviewSeriesName").trim();
+  state.reviewDraft.firstFiveSecondsNote = value("reviewFirstFiveSecondsNote").trim();
+  state.reviewDraft.endingCtaNote = value("reviewEndingCtaNote").trim();
+  state.reviewDraft.notes = value("reviewNotes").trim();
+  state.reviewDraft.isTrendTracking = Boolean(document.getElementById("reviewTrendTracking")?.checked);
+  state.reviewDraft.hasPersonOnCamera = Boolean(document.getElementById("reviewPersonOnCamera")?.checked);
+  state.reviewDraft.hasFollowCta = Boolean(document.getElementById("reviewFollowCta")?.checked);
+}
+
+function reviewOptions(field) {
+  const configured = state.data.reviewMetadata?.options?.[field] || [];
+  const selected = state.reviewDraft?.[field] || [];
+  return [...new Set([...configured, ...selected])];
+}
+
+function renderReviewFields() {
+  const container = document.getElementById("noteReviewFields");
+  if (!container || !state.reviewDraft) return;
+  container.innerHTML = Object.entries(REVIEW_FIELD_META).map(([field, label]) => {
+    const selected = new Set(state.reviewDraft[field] || []);
+    return `
+      <section class="review-field-group">
+        <h4>${escapeHtml(label)}</h4>
+        <div class="review-option-list">
+          ${reviewOptions(field).map((option) => `
+            <button
+              class="review-option ${selected.has(option) ? "selected" : ""}"
+              type="button"
+              data-review-field="${field}"
+              data-review-value="${encodeURIComponent(option)}"
+              aria-pressed="${selected.has(option)}"
+            >${escapeHtml(option)}</button>
+          `).join("")}
+        </div>
+        <div class="review-custom-row">
+          <input class="review-custom-input" data-review-custom-input="${field}" type="text" maxlength="40" placeholder="新增自定义选项" />
+          <button class="button" type="button" data-review-add="${field}">添加</button>
+        </div>
+      </section>
+    `;
+  }).join("");
+}
+
+function renderNoteReviewCard() {
+  const select = document.getElementById("reviewNoteSelect");
+  if (!select) return;
+  state.data.reviewMetadata ||= {
+    updatedAt: "",
+    reviewCount: 0,
+    options: Object.fromEntries(Object.keys(REVIEW_FIELD_META).map((field) => [field, []]))
+  };
+  const note = selectedReviewNote();
+  select.innerHTML = state.data.notes.map((item) => (
+    `<option value="${escapeHtml(item.noteKey)}" ${item.noteKey === state.reviewNoteKey ? "selected" : ""}>${escapeHtml(shortTitle(item.title))}</option>`
+  )).join("");
+
+  if (!state.reviewDraft) resetReviewDraft();
+  renderReviewFields();
+  document.getElementById("reviewVideoDuration").value = state.reviewDraft.videoDurationSeconds || "";
+  document.getElementById("reviewSeriesName").value = state.reviewDraft.seriesName || "";
+  document.getElementById("reviewFirstFiveSecondsNote").value = state.reviewDraft.firstFiveSecondsNote || "";
+  document.getElementById("reviewEndingCtaNote").value = state.reviewDraft.endingCtaNote || "";
+  document.getElementById("reviewNotes").value = state.reviewDraft.notes || "";
+  document.getElementById("reviewTrendTracking").checked = Boolean(state.reviewDraft.isTrendTracking);
+  document.getElementById("reviewPersonOnCamera").checked = Boolean(state.reviewDraft.hasPersonOnCamera);
+  document.getElementById("reviewFollowCta").checked = Boolean(state.reviewDraft.hasFollowCta);
+
+  const reviewed = state.data.notes.filter((item) => item.review).length;
+  document.getElementById("noteReviewProgress").textContent =
+    `已复盘 ${reviewed}/${state.data.notes.length} 篇${note?.review?.updatedAt ? `；当前笔记上次保存于 ${new Date(note.review.updatedAt).toLocaleString("zh-CN")}` : "；当前笔记尚未标注"}`;
+}
+
+async function saveNoteReview() {
+  const note = selectedReviewNote();
+  if (!note) return;
+  syncReviewDraftFromForm();
+  const button = document.getElementById("saveNoteReviewBtn");
+  const status = document.getElementById("noteReviewStatus");
+  button.disabled = true;
+  button.textContent = "保存中...";
+  status.textContent = "";
+  try {
+    const response = await fetch("/api/note-reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteKey: note.noteKey, review: state.reviewDraft })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "保存失败");
+    note.review = result.review;
+    state.benchmarkCache = new Map();
+    state.data.reviewMetadata = {
+      ...(state.data.reviewMetadata || {}),
+      updatedAt: result.updatedAt,
+      options: result.options,
+      reviewCount: state.data.notes.filter((item) => item.review).length
+    };
+    resetReviewDraft();
+    renderNoteReviewCard();
+    renderNotesCompareFilters();
+    renderNotesCompareTable();
+    status.textContent = "已保存到本机";
+  } catch (error) {
+    status.textContent = `保存失败：${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "保存复盘";
+  }
+}
+
 function renderNotesCompareFilters() {
   const select = document.getElementById("notesCompareTag");
   if (!select) return;
@@ -1327,6 +1557,7 @@ function renderNotesCompareTable() {
       <td><div class="metric-main">${formatPct(record.followRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.collectRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.spreadRate)}</div></td>
+      <td><button class="button review-edit-button" type="button" data-review-note="${escapeHtml(record.note.noteKey)}">${record.review ? "编辑" : "补标签"}</button></td>
     </tr>
   `).join("");
   renderPagination("notes", rows.length);
@@ -1334,6 +1565,7 @@ function renderNotesCompareTable() {
 }
 
 function renderNotesCompare() {
+  renderNoteReviewCard();
   renderNotesCompareFilters();
   renderNotesCompareTable();
 }
@@ -1345,7 +1577,9 @@ function csvEscape(value) {
 
 function exportNotesReport() {
   const headers = [
-    "标题", "发布时间", "类型", "标签", "曝光", "观看", "官方封面点击率", "观看曝光比", "平均观看时长",
+    "标题", "发布时间", "内容类型", "标签", "形式", "核心钩子", "封面风格", "前5秒结构", "目标动作", "目标人群",
+    "系列名称", "热点追踪", "真人出镜", "关注引导", "视频时长(秒)",
+    "曝光", "观看", "官方封面点击率", "观看曝光比", "平均观看时长",
     "点赞", "评论", "收藏", "分享", "涨粉", "CES评分", "互动率", "转粉率", "收藏率", "传播率"
   ];
   const rows = notesCompareRecords().map((record) => [
@@ -1353,6 +1587,17 @@ function exportNotesReport() {
     record.publishedAtText,
     record.type,
     record.labels.join("|"),
+    record.formats.join("|"),
+    record.hooks.join("|"),
+    record.coverStyles.join("|"),
+    record.firstFiveSecondStructures.join("|"),
+    record.targetActions.join("|"),
+    record.audiences.join("|"),
+    record.review?.seriesName || "",
+    record.review?.isTrendTracking ? "是" : "否",
+    record.review?.hasPersonOnCamera ? "是" : "否",
+    record.review?.hasFollowCta ? "是" : "否",
+    record.review?.videoDurationSeconds || "",
     record.impressions,
     record.views,
     formatOptionalPct(record.officialCoverClickRate),
@@ -1417,6 +1662,8 @@ function render() {
 async function loadData() {
   const response = await fetch("/api/data");
   state.data = await response.json();
+  state.reviewDraft = null;
+  state.benchmarkCache = new Map();
   render();
 }
 
@@ -1426,6 +1673,8 @@ async function refreshImport() {
   button.textContent = "导入中...";
   const response = await fetch("/api/import", { method: "POST" });
   state.data = await response.json();
+  state.reviewDraft = null;
+  state.benchmarkCache = new Map();
   button.disabled = false;
   button.textContent = "重新导入";
   render();
@@ -1475,6 +1724,39 @@ document.getElementById("notesCompareTag").addEventListener("change", (event) =>
   resetTablePage("notes");
   renderNotesCompareTable();
 });
+document.getElementById("reviewNoteSelect").addEventListener("change", (event) => {
+  state.reviewNoteKey = event.target.value;
+  resetReviewDraft();
+  renderNoteReviewCard();
+});
+document.getElementById("saveNoteReviewBtn").addEventListener("click", saveNoteReview);
+document.getElementById("noteReviewFields").addEventListener("click", (event) => {
+  const option = event.target.closest("[data-review-field][data-review-value]");
+  if (option) {
+    syncReviewDraftFromForm();
+    const field = option.dataset.reviewField;
+    const value = decodeURIComponent(option.dataset.reviewValue);
+    const selected = new Set(state.reviewDraft[field] || []);
+    if (selected.has(value)) selected.delete(value);
+    else selected.add(value);
+    state.reviewDraft[field] = [...selected];
+    renderReviewFields();
+    return;
+  }
+
+  const addButton = event.target.closest("[data-review-add]");
+  if (!addButton) return;
+  syncReviewDraftFromForm();
+  const field = addButton.dataset.reviewAdd;
+  const input = document.querySelector(`[data-review-custom-input="${field}"]`);
+  const value = input?.value.trim();
+  if (!value) return;
+  state.reviewDraft[field] = [...new Set([...(state.reviewDraft[field] || []), value])];
+  state.data.reviewMetadata.options[field] = [
+    ...new Set([...(state.data.reviewMetadata.options[field] || []), value])
+  ];
+  renderReviewFields();
+});
 document.getElementById("exportNotesReportBtn").addEventListener("click", exportNotesReport);
 document.getElementById("searchInput").addEventListener("input", (event) => {
   state.search = event.target.value;
@@ -1501,6 +1783,15 @@ document.getElementById("filterTabs").addEventListener("click", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const reviewButton = event.target.closest("[data-review-note]");
+  if (reviewButton) {
+    state.reviewNoteKey = reviewButton.dataset.reviewNote;
+    resetReviewDraft();
+    renderNoteReviewCard();
+    document.querySelector(".note-review-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
   const header = event.target.closest("th[data-table][data-sort-key]");
   if (header) {
     setTableSort(header.dataset.table, header.dataset.sortKey);

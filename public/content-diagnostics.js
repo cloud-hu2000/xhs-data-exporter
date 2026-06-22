@@ -3,23 +3,25 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.ContentDiagnostics = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function createContentDiagnostics() {
-  const DIAGNOSTIC_THRESHOLDS = Object.freeze({
-    minViews: 100,
-    highExposure: 800,
-    lowClickRate: 0.1,
-    weakTwoSecondExitRate: 0.45,
-    healthyViewRate: 0.12,
-    lowInteractionRate: 0.04,
-    highCollectRate: 0.03,
-    minCollects: 3,
-    highCommentRate: 0.01,
-    lowCollectRateForDiscussion: 0.01,
-    minComments: 2,
-    highShareRate: 0.01,
-    minShares: 2,
-    healthyFollowRate: 0.004
+  const BENCHMARK_CONFIG = Object.freeze({
+    recentLimit: 30,
+    minimumPeers: 3
   });
-  const MIN_DIAGNOSTIC_VIEWS = DIAGNOSTIC_THRESHOLDS.minViews;
+
+  const METRIC_META = Object.freeze({
+    impressions: { label: "曝光", format: "number", direction: "high" },
+    views: { label: "观看", format: "number", direction: "high" },
+    viewRate: { label: "观看曝光比", format: "rate", direction: "high" },
+    officialCoverClickRate: { label: "官方封面点击率", format: "rate", direction: "high", nullable: true },
+    interactionRate: { label: "互动率", format: "rate", direction: "high" },
+    likeRate: { label: "点赞率", format: "rate", direction: "high" },
+    commentRate: { label: "评论率", format: "rate", direction: "high" },
+    collectRate: { label: "收藏率", format: "rate", direction: "high" },
+    shareRate: { label: "分享率", format: "rate", direction: "high" },
+    followRate: { label: "关注率", format: "rate", direction: "high" },
+    completionRate: { label: "完播率", format: "rate", direction: "high", nullable: true },
+    twoSecondExitRate: { label: "2 秒退出率", format: "rate", direction: "low", nullable: true }
+  });
 
   function pctValue(value) {
     const number = Number(value || 0);
@@ -36,6 +38,9 @@
     const shares = Number(note.shares || 0);
     const followersGained = Number(note.followersGained || 0);
     const interactions = likes + comments + collects + shares;
+    const hasOfficialCoverClickRate = Boolean(note.hasOfficialCoverClickRate || Number(note.coverClickRatePct || 0) > 0);
+    const hasCompletionRate = Number(note.completionRatePct || 0) > 0;
+    const hasTwoSecondExitRate = Number(note.twoSecondExitRatePct || 0) > 0;
 
     return {
       impressions,
@@ -53,79 +58,220 @@
       collectRate: views ? collects / views : 0,
       shareRate: views ? shares / views : 0,
       followRate: views ? followersGained / views : 0,
-      officialCoverClickRate: note.hasOfficialCoverClickRate ? pctValue(note.coverClickRatePct) : null,
-      completionRate: pctValue(note.completionRatePct),
-      twoSecondExitRate: pctValue(note.twoSecondExitRatePct),
-      hasCompletionRate: Number(note.completionRatePct || 0) > 0,
-      hasTwoSecondExitRate: Number(note.twoSecondExitRatePct || 0) > 0
+      officialCoverClickRate: hasOfficialCoverClickRate ? pctValue(note.coverClickRatePct) : null,
+      completionRate: hasCompletionRate ? pctValue(note.completionRatePct) : null,
+      twoSecondExitRate: hasTwoSecondExitRate ? pctValue(note.twoSecondExitRatePct) : null,
+      hasCompletionRate,
+      hasTwoSecondExitRate
     };
   }
 
-  function contentDiagnostics(note) {
-    const rates = contentRates(note);
-    const items = [];
+  function quantile(sortedValues, percentile) {
+    if (sortedValues.length === 0) return null;
+    const index = (sortedValues.length - 1) * percentile;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    if (lower === upper) return sortedValues[lower];
+    const weight = index - lower;
+    return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+  }
 
-    if (rates.views < MIN_DIAGNOSTIC_VIEWS) {
+  function metricStats(values) {
+    const sorted = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+    if (sorted.length === 0) return null;
+    return {
+      count: sorted.length,
+      q25: quantile(sorted, 0.25),
+      median: quantile(sorted, 0.5),
+      q75: quantile(sorted, 0.75),
+      mean: sorted.reduce((sum, value) => sum + value, 0) / sorted.length,
+      min: sorted[0],
+      max: sorted[sorted.length - 1]
+    };
+  }
+
+  function normalizedValues(values) {
+    return [...new Set((values || []).map((value) => String(value).trim()).filter(Boolean))].sort();
+  }
+
+  function sharesValue(left, right) {
+    const a = normalizedValues(left);
+    const b = normalizedValues(right);
+    return a.length > 0 && b.length > 0 && a.some((value) => b.includes(value));
+  }
+
+  function noteTimestamp(note) {
+    const value = note._benchmarkDate || note.firstMetricDate || "";
+    const timestamp = new Date(String(value).replace(" ", "T")).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function cohortCandidates(notes, target) {
+    const others = notes.filter((note) => note.noteKey !== target.noteKey);
+    const review = target.review || {};
+    const cohorts = [];
+
+    if (review.seriesName) {
+      cohorts.push({
+        kind: "series",
+        label: `同系列“${review.seriesName}”`,
+        notes: others.filter((note) => note.review?.seriesName === review.seriesName)
+      });
+    }
+    if ((review.contentTypes || []).length > 0 && (review.formats || []).length > 0) {
+      cohorts.push({
+        kind: "content-format",
+        label: `${review.contentTypes.join(" / ")} × ${review.formats.join(" / ")}`,
+        notes: others.filter((note) => (
+          sharesValue(note.review?.contentTypes, review.contentTypes)
+          && sharesValue(note.review?.formats, review.formats)
+        ))
+      });
+    }
+    if ((review.contentTypes || []).length > 0) {
+      cohorts.push({
+        kind: "content-type",
+        label: `同类“${review.contentTypes.join(" / ")}”`,
+        notes: others.filter((note) => sharesValue(note.review?.contentTypes, review.contentTypes))
+      });
+    }
+    cohorts.push({
+      kind: "recent",
+      label: `最近 ${Math.min(BENCHMARK_CONFIG.recentLimit, others.length)} 篇账号内容`,
+      notes: [...others].sort((a, b) => noteTimestamp(b) - noteTimestamp(a)).slice(0, BENCHMARK_CONFIG.recentLimit)
+    });
+    return cohorts;
+  }
+
+  function selectPeerCohort(notes, target) {
+    const cohorts = cohortCandidates(notes, target);
+    return cohorts.find((cohort) => cohort.notes.length >= BENCHMARK_CONFIG.minimumPeers)
+      || cohorts[cohorts.length - 1];
+  }
+
+  function buildRelativeBenchmark(notes, target) {
+    const selected = selectPeerCohort(notes, target);
+    const peerRates = selected.notes.map(contentRates);
+    const metrics = {};
+
+    for (const metric of Object.keys(METRIC_META)) {
+      metrics[metric] = metricStats(peerRates.map((rates) => rates[metric]).filter((value) => value != null));
+    }
+
+    return {
+      kind: selected.kind,
+      label: selected.label,
+      peerCount: selected.notes.length,
+      sufficient: selected.notes.length >= BENCHMARK_CONFIG.minimumPeers,
+      metrics
+    };
+  }
+
+  function compareMetric(value, stats, direction = "high") {
+    if (value == null || !stats) return null;
+    const relativeToMedian = stats.median === 0
+      ? (value === 0 ? 0 : null)
+      : (value - stats.median) / Math.abs(stats.median);
+    const band = value < stats.q25 ? "low" : value > stats.q75 ? "high" : "normal";
+    return {
+      value,
+      band,
+      relativeToMedian,
+      favorable: direction === "low" ? band === "low" : band === "high",
+      unfavorable: direction === "low" ? band === "high" : band === "low",
+      stats
+    };
+  }
+
+  function formatMetric(metric, value) {
+    if (value == null) return "-";
+    if (METRIC_META[metric]?.format === "number") return Math.round(value).toLocaleString("zh-CN");
+    return `${(value * 100).toFixed(1)}%`;
+  }
+
+  function comparisonText(metric, comparison, benchmark) {
+    if (!comparison) return "";
+    const current = formatMetric(metric, comparison.value);
+    const median = formatMetric(metric, comparison.stats.median);
+    let difference = "与中位数持平";
+    if (comparison.stats.median === 0 && comparison.value > 0) {
+      difference = "高于中位数";
+    } else if (comparison.relativeToMedian != null && Math.abs(comparison.relativeToMedian) >= 0.005) {
+      difference = `比中位数${comparison.relativeToMedian > 0 ? "高" : "低"} ${Math.abs(comparison.relativeToMedian * 100).toFixed(0)}%`;
+    }
+    return `${METRIC_META[metric].label} ${current}，${difference}（${benchmark.label}中位数 ${median}，样本 ${benchmark.peerCount} 篇）`;
+  }
+
+  function contentDiagnostics(note, benchmark) {
+    const rates = contentRates(note);
+    if (!benchmark?.sufficient) {
       return [{
-        type: "! 样本不足",
-        detail: `当前观看数 ${rates.views}，低于 ${MIN_DIAGNOSTIC_VIEWS}，各行为率容易失真，暂不做强诊断。`
+        type: "基准积累中",
+        detail: `当前只有 ${benchmark?.peerCount || 0} 篇可比历史；至少积累 ${BENCHMARK_CONFIG.minimumPeers} 篇后再做相对诊断。`
       }];
     }
 
-    const clickRate = rates.officialCoverClickRate == null ? rates.viewRate : rates.officialCoverClickRate;
-    if (rates.impressions >= DIAGNOSTIC_THRESHOLDS.highExposure && clickRate < DIAGNOSTIC_THRESHOLDS.lowClickRate) {
+    const entryMetric = rates.officialCoverClickRate != null
+      && benchmark.metrics.officialCoverClickRate?.count >= BENCHMARK_CONFIG.minimumPeers
+      ? "officialCoverClickRate"
+      : "viewRate";
+    const compare = (metric) => compareMetric(rates[metric], benchmark.metrics[metric], METRIC_META[metric].direction);
+    const entry = compare(entryMetric);
+    const exposure = compare("impressions");
+    const interaction = compare("interactionRate");
+    const collect = compare("collectRate");
+    const comment = compare("commentRate");
+    const share = compare("shareRate");
+    const follow = compare("followRate");
+    const twoSecondExit = compare("twoSecondExitRate");
+    const items = [];
+
+    if (exposure?.band === "high" && entry?.band === "low") {
       items.push({
-        type: "高曝光低点击",
-        detail: "入口转化偏弱，优先测试封面、标题和首屏信息，不把问题归因到后续互动。"
+        type: "分发高但入口偏弱",
+        detail: `${comparisonText(entryMetric, entry, benchmark)}。曝光已处于同类前 25%，问题更可能在封面和标题，而不是分发不足。`
       });
     }
-    if (rates.hasTwoSecondExitRate && rates.twoSecondExitRate >= DIAGNOSTIC_THRESHOLDS.weakTwoSecondExitRate) {
+    if (twoSecondExit?.band === "high") {
       items.push({
         type: "前段留存偏弱",
-        detail: "2 秒退出率偏高，检查开头是否快速兑现标题承诺、减少铺垫。"
+        detail: `${comparisonText("twoSecondExitRate", twoSecondExit, benchmark)}。优先检查前 5 秒是否兑现标题承诺。`
       });
     }
-    if (rates.viewRate >= DIAGNOSTIC_THRESHOLDS.healthyViewRate
-      && rates.interactionRate < DIAGNOSTIC_THRESHOLDS.lowInteractionRate) {
+    if (entry?.band !== "low" && interaction?.band === "low") {
       items.push({
-        type: "高观看低互动",
-        detail: "入口有效，但观看后的点赞、评论、收藏和分享整体偏弱，可加强观点、价值密度或行动触发。"
+        type: "入口正常但互动偏弱",
+        detail: `${comparisonText("interactionRate", interaction, benchmark)}。入口不弱，问题更可能在内容共鸣、价值密度或行动触发。`
       });
     }
-    if (rates.collects >= DIAGNOSTIC_THRESHOLDS.minCollects
-      && rates.collectRate >= DIAGNOSTIC_THRESHOLDS.highCollectRate
-      && rates.followRate < DIAGNOSTIC_THRESHOLDS.healthyFollowRate) {
+    if (collect?.band === "high" && follow?.band === "low") {
       items.push({
-        type: "高收藏低关注",
-        detail: "内容具有保存价值，但关注理由相对弱；检查人设、系列感和主页承接。"
+        type: "收藏突出但关注偏弱",
+        detail: `${comparisonText("collectRate", collect, benchmark)}；${comparisonText("followRate", follow, benchmark)}。内容有保存价值，但账号承接和持续关注理由偏弱。`
       });
     }
-    if (rates.comments >= DIAGNOSTIC_THRESHOLDS.minComments
-      && rates.commentRate >= DIAGNOSTIC_THRESHOLDS.highCommentRate
-      && rates.collectRate < DIAGNOSTIC_THRESHOLDS.lowCollectRateForDiscussion) {
+    if (comment?.band === "high" && collect?.band === "low") {
       items.push({
-        type: "讨论强沉淀弱",
-        detail: "评论意愿明显高于收藏意愿，说明话题性强；若目标是沉淀，可补充清单、步骤或结论。"
+        type: "讨论突出但沉淀偏弱",
+        detail: `${comparisonText("commentRate", comment, benchmark)}；${comparisonText("collectRate", collect, benchmark)}。话题性强，若目标是沉淀可补充清单、步骤或结论卡。`
       });
     }
-    if (rates.shares >= DIAGNOSTIC_THRESHOLDS.minShares
-      && rates.shareRate >= DIAGNOSTIC_THRESHOLDS.highShareRate
-      && rates.followRate < DIAGNOSTIC_THRESHOLDS.healthyFollowRate) {
+    if (share?.band === "high" && follow?.band === "low") {
       items.push({
-        type: "传播强关注弱",
-        detail: "内容值得转发，但账号价值没有同步转化；检查署名、人设和持续关注预期。"
+        type: "传播突出但关注偏弱",
+        detail: `${comparisonText("shareRate", share, benchmark)}；${comparisonText("followRate", follow, benchmark)}。内容值得转发，但人设或系列承接未同步转化。`
       });
     }
-    if (rates.followersGained > 0 && rates.followRate >= DIAGNOSTIC_THRESHOLDS.healthyFollowRate) {
+    if (follow?.band === "high") {
       items.push({
-        type: "关注转化突出",
-        detail: "观看后的关注转化较好，值得复刻选题角度、表达方式和账号承接。"
+        type: "关注转化位于同类前列",
+        detail: `${comparisonText("followRate", follow, benchmark)}。值得复刻选题角度、表达方式和关注承接。`
       });
     }
     if (items.length === 0) {
       items.push({
-        type: "行为分布均衡",
-        detail: "暂未发现明显短板；继续按点击、留存和各观看后行为分别积累样本。"
+        type: "处于同类正常区间",
+        detail: `核心指标大多位于${benchmark.label}的中间 50% 区间，暂未发现明显异常。`
       });
     }
     return items;
@@ -143,10 +289,15 @@
   }
 
   return {
-    DIAGNOSTIC_THRESHOLDS,
-    MIN_DIAGNOSTIC_VIEWS,
+    BENCHMARK_CONFIG,
+    METRIC_META,
     behaviorBranches,
+    buildRelativeBenchmark,
+    compareMetric,
+    comparisonText,
     contentDiagnostics,
-    contentRates
+    contentRates,
+    metricStats,
+    selectPeerCohort
   };
 }));

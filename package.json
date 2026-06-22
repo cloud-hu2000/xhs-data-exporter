@@ -10,7 +10,7 @@
     "inspect": "node src/inspect-page.js",
     "import": "node src/import-xhs-data.js",
     "dashboard": "node src/dashboard-server.js",
-    "test": "node test/metric-field-mapping.test.js && node test/content-diagnostics.test.js"
+    "test": "node test/metric-field-mapping.test.js && node test/content-diagnostics.test.js && node test/note-review-store.test.js"
   },
   "dependencies": {
     "echarts": "^6.1.0",
