@@ -5,6 +5,7 @@
   "description": "Export Xiaohongshu creator note detail data from a logged-in browser session.",
   "type": "commonjs",
   "scripts": {
+    "start": "node src/cli.js",
     "browser": "node src/open-browser.js",
     "export": "node src/export-xhs.js",
     "inspect": "node src/inspect-page.js",

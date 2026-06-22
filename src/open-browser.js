@@ -29,5 +29,4 @@ child.unref();
 
 console.log(`已打开浏览器: ${browserPath}`);
 console.log(`调试端口: ${config.debugPort}`);
-console.log("请在打开的浏览器里登录小红书创作者中心。登录完成后运行：");
-console.log("npm.cmd run export");
+console.log("请在打开的浏览器里登录小红书创作者中心，并保持窗口开启。");

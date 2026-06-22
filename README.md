@@ -6,68 +6,32 @@
 
 https://creator.xiaohongshu.com/statistics/data-analysis
 
-## 第一次使用
+## 使用方法
 
-可以直接双击：
+只需要双击唯一入口：
 
 ```text
-00-install-deps.bat
+run.bat
 ```
 
-或者在终端安装依赖：
+首次运行会自动检查并安装依赖。推荐选择“一键完整流程”，按提示完成登录确认后，工具会自动：
+
+1. 全量导出笔记数据。
+2. 导入下载文件并生成统一数据表。
+3. 启动并打开分析中心。
+
+也可以在菜单中单独执行测试导出、打开登录浏览器、导入数据、检查页面按钮等操作。
+
+命令行用户可以直接传入命令：
 
 ```powershell
-cd C:\Users\FG\Documents\mutiDataAnalysis\xhs-data-exporter
-npm.cmd install
-```
-
-然后双击：
-
-```text
-01-open-browser-login.bat
-```
-
-或者在终端打开专用浏览器：
-
-```powershell
-npm.cmd run browser
-```
-
-浏览器打开后，手动登录小红书创作者中心，并进入“数据分析”页面。
-
-## 开始导出
-
-登录完成后，不要关闭刚才打开的浏览器窗口。另开一个终端运行：
-
-测试 1 条笔记：
-
-```text
-02-export-test-one.bat
-```
-
-全量导出：
-
-```text
-03-export-all.bat
-```
-
-导入 Excel 并生成统一数据表：
-
-```text
-05-import-data.bat
-```
-
-打开小红书数据分析中心：
-
-```text
-06-open-analysis-center.bat
-```
-
-或者在终端运行：
-
-```powershell
-cd C:\Users\FG\Documents\mutiDataAnalysis\xhs-data-exporter
-npm.cmd run export
+run.bat full
+run.bat test
+run.bat browser
+run.bat export
+run.bat import
+run.bat dashboard
+run.bat inspect
 ```
 
 脚本会：
@@ -78,12 +42,7 @@ npm.cmd run export
 4. 在详情页点击“导出”。
 5. 如果有分页，继续点击“下一页”。
 
-只测试 1 条笔记时可以这样运行：
-
-```powershell
-$env:XHS_MAX_NOTES="1"
-npm.cmd run export
-```
+只测试 1 条笔记时，在 `run.bat` 菜单中选择“测试流程”即可。
 
 导出的文件默认放在：
 
@@ -99,17 +58,7 @@ C:\Users\FG\Documents\mutiDataAnalysis\xhs-data-exporter\data
 
 ## 页面按钮识别不准时
 
-如果小红书页面里的按钮文案不是“详情数据”或“导出”，先运行：
-
-```text
-04-inspect-page.bat
-```
-
-或者在终端运行：
-
-```powershell
-npm.cmd run inspect
-```
+如果小红书页面里的按钮文案不是“详情数据”或“导出”，在 `run.bat` 菜单中选择“检查当前页面按钮”。
 
 它会列出当前页面可点击元素的文字。然后修改 `config.json` 里的：
 
@@ -126,6 +75,6 @@ npm.cmd run inspect
 ## 注意
 
 - 这个工具不会保存账号密码。
-- 请使用 `npm.cmd`，不要直接用 `npm`，因为当前 PowerShell 执行策略会拦截 `npm.ps1`。
-- 如果浏览器没有打开，`npm.cmd run export` 会提示连接失败。
+- Windows 下依赖安装会自动使用 `npm.cmd`，无需手动处理 PowerShell 执行策略。
+- 导出前如果浏览器没有打开，统一入口会自动打开并等待登录确认。
 - 如果小红书把导出做成异步任务，脚本会完成点击，但文件可能需要在页面里稍后下载。
