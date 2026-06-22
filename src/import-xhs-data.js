@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const { definitionsForClient, resolveMetricField } = require("./metric-field-mapping");
 
 const projectRoot = path.resolve(__dirname, "..");
 const downloadsDir = path.join(projectRoot, "downloads");
@@ -10,6 +11,10 @@ const coverManifestPath = path.join(dataDir, "note-covers.json");
 const BASIC_OVERVIEW = "基础数据总览";
 const INTERACTION_OVERVIEW = "互动数据总览";
 const MIN_DIAGNOSTIC_VIEWS = 100;
+const REQUIRED_FIELDS = {
+  basic: ["曝光数", "观看数"],
+  interaction: ["点赞数", "评论数", "收藏数", "分享数"]
+};
 
 function ensureDataDir() {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -49,6 +54,34 @@ function coverRecordsByNoteKey(records) {
 
 function normalizeMetricName(value) {
   return cleanText(value).replace(/\s+/g, "").replace(/（/g, "(").replace(/）/g, ")");
+}
+
+function createFieldRecognition(file) {
+  return {
+    fileName: file.fileName,
+    kind: file.kind,
+    title: file.title,
+    recognized: [],
+    unrecognized: []
+  };
+}
+
+function recordFieldRecognition(report, scope, resolution) {
+  if (!report || !resolution.source) return;
+  const target = resolution.recognized ? report.recognized : report.unrecognized;
+  const record = resolution.recognized
+    ? {
+        scope,
+        source: resolution.source,
+        canonical: resolution.canonical,
+        fieldId: resolution.id,
+        matchedBy: resolution.matchedBy
+      }
+    : { scope, source: resolution.source };
+  const key = `${record.scope}::${record.source}::${record.canonical || ""}`;
+  if (!target.some((item) => `${item.scope}::${item.source}::${item.canonical || ""}` === key)) {
+    target.push(record);
+  }
 }
 
 function numberValue(value) {
@@ -102,17 +135,20 @@ function sheetRows(workbook, sheetName) {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
 }
 
-function parseOverview(rows) {
+function parseOverview(rows, recognition) {
   const metrics = {};
   for (const row of rows.slice(1)) {
-    const key = normalizeMetricName(row[0]);
-    if (!key) continue;
-    metrics[key] = numberValue(row[1]);
+    const source = normalizeMetricName(row[0]);
+    if (!source) continue;
+    const resolution = resolveMetricField(source);
+    recordFieldRecognition(recognition, "overview", resolution);
+    if (!resolution.recognized) continue;
+    metrics[resolution.canonical] = numberValue(row[1]);
   }
   return metrics;
 }
 
-function parseSeries(workbook, meta, granularity) {
+function parseSeries(workbook, meta, granularity, recognition) {
   const rows = [];
   for (const sheetName of workbook.SheetNames) {
     if (sheetName.includes("总览")) continue;
@@ -123,7 +159,11 @@ function parseSeries(workbook, meta, granularity) {
     const data = sheetRows(workbook, sheetName);
     if (data.length < 2) continue;
 
-    const metric = normalizeMetricName(data[0][1] || sheetName.replace(/（.*$/, ""));
+    const sourceMetric = normalizeMetricName(data[0][1] || sheetName.replace(/（.*$/, ""));
+    const resolution = resolveMetricField(sourceMetric);
+    recordFieldRecognition(recognition, "series", resolution);
+    if (!resolution.recognized) continue;
+    const metric = resolution.canonical;
     for (const row of data.slice(1)) {
       const bucket = isHour ? parseChineseHour(row[0]) : parseChineseDate(row[0]);
       if (!bucket) continue;
@@ -142,8 +182,8 @@ function parseSeries(workbook, meta, granularity) {
 }
 
 function metricBelongsToKind(metric, kind) {
-  const basic = new Set(["曝光数", "观看数", "封面点击率", "人均观看时长", "涨粉数"]);
-  const interaction = new Set(["点赞数", "评论数", "收藏数", "笔记分享数"]);
+  const basic = new Set(["曝光数", "观看数", "封面点击率", "平均观看时长", "完播率", "2秒退出率", "涨粉数"]);
+  const interaction = new Set(["点赞数", "评论数", "收藏数", "分享数", "弹幕数"]);
   if (kind === "basic") return basic.has(metric);
   if (kind === "interaction") return interaction.has(metric);
   return true;
@@ -215,15 +255,15 @@ function latestFiles(files) {
 }
 
 function mergeBasic(note, metrics) {
-  const hasOfficialCoverClickRate = Object.prototype.hasOwnProperty.call(metrics, "封面点击率(%)");
+  const hasOfficialCoverClickRate = Object.prototype.hasOwnProperty.call(metrics, "封面点击率");
   Object.assign(note, {
     impressions: metrics["曝光数"] ?? note.impressions ?? 0,
     views: metrics["观看数"] ?? note.views ?? 0,
-    coverClickRatePct: metrics["封面点击率(%)"] ?? note.coverClickRatePct ?? 0,
+    coverClickRatePct: metrics["封面点击率"] ?? note.coverClickRatePct ?? 0,
     hasOfficialCoverClickRate: hasOfficialCoverClickRate || note.hasOfficialCoverClickRate || false,
-    avgWatchSeconds: metrics["平均观看时长(s)"] ?? note.avgWatchSeconds ?? 0,
-    completionRatePct: metrics["完播率(%)"] ?? note.completionRatePct ?? 0,
-    twoSecondExitRatePct: metrics["2秒退出率(%)"] ?? note.twoSecondExitRatePct ?? 0,
+    avgWatchSeconds: metrics["平均观看时长"] ?? note.avgWatchSeconds ?? 0,
+    completionRatePct: metrics["完播率"] ?? note.completionRatePct ?? 0,
+    twoSecondExitRatePct: metrics["2秒退出率"] ?? note.twoSecondExitRatePct ?? 0,
     followersGained: metrics["涨粉数"] ?? note.followersGained ?? 0
   });
 }
@@ -278,6 +318,7 @@ function importData() {
   const dailyMetrics = [];
   const hourlyMetrics = [];
   const importedFiles = [];
+  const fieldRecognitionFiles = [];
 
   for (const file of chosen) {
     const noteKey = noteKeyFromTitle(file.title);
@@ -291,7 +332,8 @@ function importData() {
 
     const workbook = XLSX.readFile(file.fullPath, { cellDates: true });
     const overviewName = file.kind === "basic" ? BASIC_OVERVIEW : INTERACTION_OVERVIEW;
-    const overview = parseOverview(sheetRows(workbook, overviewName));
+    const fieldRecognition = createFieldRecognition(file);
+    const overview = parseOverview(sheetRows(workbook, overviewName), fieldRecognition);
 
     const note = noteMap.get(noteKey) || {
       noteKey,
@@ -306,8 +348,12 @@ function importData() {
     note.sourceFiles.push(file.fileName);
     noteMap.set(noteKey, note);
 
-    dailyMetrics.push(...parseSeries(workbook, meta, "day").filter((row) => metricBelongsToKind(row.metric, file.kind)));
-    hourlyMetrics.push(...parseSeries(workbook, meta, "hour").filter((row) => metricBelongsToKind(row.metric, file.kind)));
+    dailyMetrics.push(...parseSeries(workbook, meta, "day", fieldRecognition).filter((row) => metricBelongsToKind(row.metric, file.kind)));
+    hourlyMetrics.push(...parseSeries(workbook, meta, "hour", fieldRecognition).filter((row) => metricBelongsToKind(row.metric, file.kind)));
+    const recognizedCanonical = new Set(fieldRecognition.recognized.map((item) => item.canonical));
+    fieldRecognition.missingRequired = (REQUIRED_FIELDS[file.kind] || [])
+      .filter((field) => !recognizedCanonical.has(field));
+    fieldRecognitionFiles.push(fieldRecognition);
     importedFiles.push({
       fileName: file.fileName,
       kind: file.kind,
@@ -353,7 +399,32 @@ function importData() {
   };
 
   const lifecycleMilestones = buildLifecycleMilestones(notes, dailyMetrics, hourlyMetrics);
-  const database = { summary, notes, dailyMetrics, hourlyMetrics, lifecycleMilestones, coverRecords, importedFiles, skippedFiles: skipped };
+  const unrecognizedFields = [...new Set(fieldRecognitionFiles.flatMap((file) => file.unrecognized.map((item) => item.source)))];
+  const missingRequiredFields = fieldRecognitionFiles
+    .filter((file) => file.missingRequired.length > 0)
+    .map((file) => ({ fileName: file.fileName, fields: file.missingRequired }));
+  const aliasMatches = fieldRecognitionFiles.flatMap((file) => file.recognized).filter((item) => item.matchedBy === "alias");
+  const fieldMapping = {
+    status: unrecognizedFields.length > 0 || missingRequiredFields.length > 0 ? "needs-confirmation" : "ready",
+    recognizedFieldCount: fieldRecognitionFiles.reduce((sum, file) => sum + file.recognized.length, 0),
+    aliasMatchCount: aliasMatches.length,
+    unrecognizedFieldCount: unrecognizedFields.length,
+    unrecognizedFields,
+    missingRequiredFields,
+    definitions: definitionsForClient(),
+    files: fieldRecognitionFiles
+  };
+  const database = {
+    summary,
+    fieldMapping,
+    notes,
+    dailyMetrics,
+    hourlyMetrics,
+    lifecycleMilestones,
+    coverRecords,
+    importedFiles,
+    skippedFiles: skipped
+  };
   writeTextFile(path.join(dataDir, "xhs-unified-data.json"), JSON.stringify(database, null, 2), true);
   writeTextFile(path.join(dataDir, "notes.csv"), toCsv(notes), false);
   writeTextFile(path.join(dataDir, "daily_metrics.csv"), toCsv(dailyMetrics), false);
@@ -506,7 +577,7 @@ function buildLifecycleMilestones(notes, dailyMetrics, hourlyMetrics) {
       const likes = cumulativeMetricWithCoverage(note, "点赞数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
       const comments = cumulativeMetricWithCoverage(note, "评论数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
       const collects = cumulativeMetricWithCoverage(note, "收藏数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
-      const shares = cumulativeMetricWithCoverage(note, "笔记分享数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
+      const shares = cumulativeMetricWithCoverage(note, "分享数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
       const followersGained = cumulativeMetricWithCoverage(note, "涨粉数", milestone, dailyMetrics, hourlyMetrics, lifecycleStart);
       const interactions = combineMetricCoverage([likes, comments, collects, shares], (field) => (
         (likes[field] || 0) + (comments[field] || 0) + (collects[field] || 0) + (shares[field] || 0)
@@ -562,7 +633,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildLifecycleMilestones,
   importData,
+  mergeInteraction,
+  parseOverview,
+  parseSeries,
   dataDir,
   downloadsDir
 };

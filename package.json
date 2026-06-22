@@ -9,7 +9,8 @@
     "export": "node src/export-xhs.js",
     "inspect": "node src/inspect-page.js",
     "import": "node src/import-xhs-data.js",
-    "dashboard": "node src/dashboard-server.js"
+    "dashboard": "node src/dashboard-server.js",
+    "test": "node test/metric-field-mapping.test.js"
   },
   "dependencies": {
     "echarts": "^6.1.0",

@@ -782,6 +782,53 @@ function renderSummary() {
   document.getElementById("syncMeta").textContent = `最近导入 ${new Date(summary.generatedAt).toLocaleString("zh-CN")}，跳过 ${summary.skippedFileCount} 个重复或失败文件`;
 }
 
+function renderFieldMapping() {
+  const panel = document.getElementById("fieldMappingPanel");
+  const mapping = state.data.fieldMapping;
+  if (!mapping) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  const recognizedMap = new Map();
+  for (const file of mapping.files || []) {
+    for (const item of file.recognized || []) {
+      const key = `${item.source}::${item.canonical}`;
+      if (!recognizedMap.has(key)) recognizedMap.set(key, item);
+    }
+  }
+  const recognized = [...recognizedMap.values()].sort((a, b) => a.canonical.localeCompare(b.canonical, "zh-CN"));
+  const unrecognized = mapping.unrecognizedFields || [];
+  const missingRequired = mapping.missingRequiredFields || [];
+  const needsConfirmation = unrecognized.length > 0 || missingRequired.length > 0;
+  const issueCount = unrecognized.length + missingRequired.length;
+
+  panel.classList.remove("hidden");
+  panel.classList.toggle("needs-confirmation", needsConfirmation);
+  const importKey = `${state.data.summary.generatedAt}:${mapping.status}`;
+  if (panel.dataset.importKey !== importKey) {
+    panel.open = needsConfirmation;
+    panel.dataset.importKey = importKey;
+  }
+  document.getElementById("fieldMappingSummary").textContent =
+    `识别 ${recognized.length} 种 Excel 字段，${mapping.aliasMatchCount || 0} 次通过别名归一`;
+  document.getElementById("fieldMappingStatus").textContent =
+    needsConfirmation ? `${issueCount} 项待确认` : "字段映射正常";
+  document.getElementById("recognizedFieldList").innerHTML = recognized.map((item) => {
+    const label = item.source === item.canonical ? item.canonical : `${item.source} → ${item.canonical}`;
+    return `<span class="mapping-chip ${item.matchedBy === "alias" ? "alias" : ""}">${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const unrecognizedSection = document.getElementById("unrecognizedFieldSection");
+  unrecognizedSection.classList.toggle("hidden", !needsConfirmation);
+  document.getElementById("unrecognizedFieldList").innerHTML = unrecognized
+    .map((field) => `<span class="mapping-chip">${escapeHtml(field)}</span>`)
+    .concat(missingRequired.map((item) => (
+      `<span class="mapping-chip">${escapeHtml(item.fileName)}：缺少 ${escapeHtml(item.fields.join("、"))}</span>`
+    )))
+    .join("");
+}
+
 function renderLifecycleChart() {
   const element = document.getElementById("lifecycleChart");
   if (!state.chart) {
@@ -1344,6 +1391,7 @@ function renderView() {
 
 function render() {
   renderSummary();
+  renderFieldMapping();
   renderLifecycleChart();
   renderInsights();
   renderTable();
