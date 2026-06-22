@@ -14,6 +14,8 @@ const {
 } = require("./playwright-utils");
 
 const projectRoot = path.resolve(__dirname, "..");
+const dataDir = path.join(projectRoot, "data");
+const coverManifestPath = path.join(dataDir, "note-covers.json");
 const runStartedAt = new Date();
 const runLogPath = path.join(
   projectRoot,
@@ -58,6 +60,127 @@ function uniqueDownloadTarget(config, noteNumber, buttonNumber, originalName) {
   );
 }
 
+function readCoverManifest() {
+  if (!fs.existsSync(coverManifestPath)) return [];
+  try {
+    const payload = JSON.parse(fs.readFileSync(coverManifestPath, "utf8"));
+    return Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    console.log(`read cover manifest failed: ${error.message}`);
+    return [];
+  }
+}
+
+function exportedTitleFromFile(file) {
+  if (!file) return "";
+  const base = path.basename(file, path.extname(file));
+  const suffix = "-数据明细表";
+  const body = base.endsWith(suffix) ? base.slice(0, -suffix.length) : base;
+  const match = body.match(/^\d+-\d+-\d+-([\s\S]+)$/u);
+  return match ? match[1].replace(/\s+/g, " ").trim() : "";
+}
+
+function saveCoverRecord(record) {
+  if (!record || !record.coverImageUrl) return;
+  fs.mkdirSync(dataDir, { recursive: true });
+  const titleFromDownload = (record.downloadedFiles || []).map(exportedTitleFromFile).find(Boolean);
+  const normalized = {
+    ...record,
+    title: titleFromDownload || record.title || "",
+    noteKey: (titleFromDownload || record.title || "").replace(/\s+/g, " ").trim().toLowerCase()
+  };
+  const manifest = readCoverManifest();
+  const key = normalized.noteKey || normalized.noteId || normalized.detailUrl;
+  const next = manifest.filter((item) => (item.noteKey || item.noteId || item.detailUrl) !== key);
+  next.push(normalized);
+  fs.writeFileSync(coverManifestPath, JSON.stringify(next, null, 2), "utf8");
+}
+
+async function captureCover(detailPage, noteNumber) {
+  await detailPage.waitForSelector(
+    ".note-info-container .thumbnail img, [class*='note-info'] [class*='thumbnail'] img, .note-detail-contain .thumbnail img",
+    { timeout: 5000 }
+  ).catch(() => {});
+  return await detailPage.evaluate((capturedNoteNumber) => {
+    const absolute = (value) => {
+      try {
+        return value ? new URL(value, location.href).href : "";
+      } catch {
+        return "";
+      }
+    };
+    const coverSelectors = [
+      ".note-info-container .thumbnail img",
+      "[class*='note-info'] [class*='thumbnail'] img",
+      ".note-detail-contain .thumbnail img",
+      "[class*='thumbnail'] img"
+    ];
+    const directCover = coverSelectors
+      .map((selector) => {
+        const img = document.querySelector(selector);
+        if (!img) return null;
+        const rect = img.getBoundingClientRect();
+        const src = absolute(img.currentSrc || img.src || img.getAttribute("src"));
+        if (!src || rect.width < 40 || rect.height < 40) return null;
+        return {
+          src,
+          alt: img.alt || img.getAttribute("aria-label") || "",
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          naturalWidth: img.naturalWidth || 0,
+          naturalHeight: img.naturalHeight || 0,
+          selector
+        };
+      })
+      .find(Boolean);
+
+    const badPattern = /avatar|logo|icon|emoji|default|placeholder/i;
+    const candidates = [...document.images]
+      .map((img) => {
+        const rect = img.getBoundingClientRect();
+        const src = absolute(img.currentSrc || img.src);
+        const alt = img.alt || img.getAttribute("aria-label") || "";
+        const visible = rect.width >= 96 && rect.height >= 96 && rect.bottom > 0 && rect.right > 0;
+        const ratio = rect.height ? rect.width / rect.height : 0;
+        const ratioScore = ratio >= 0.55 && ratio <= 1.8 ? 1.25 : 0.8;
+        const penalty = badPattern.test(`${src} ${alt}`) ? 0.2 : 1;
+        return {
+          src,
+          alt,
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          naturalWidth: img.naturalWidth || 0,
+          naturalHeight: img.naturalHeight || 0,
+          score: rect.width * rect.height * ratioScore * penalty,
+          visible
+        };
+      })
+      .filter((item) => item.visible && item.src)
+      .sort((a, b) => b.score - a.score);
+    const metaImage = absolute(document.querySelector("meta[property='og:image'],meta[name='og:image']")?.content);
+    const best = directCover || candidates[0] || (metaImage ? { src: metaImage, alt: "", width: 0, height: 0, selector: "meta[property='og:image']" } : null);
+    const noteId = new URL(location.href).searchParams.get("noteId") || "";
+    const heading = [...document.querySelectorAll("h1,h2,[class*='title']")]
+      .map((el) => el.textContent.replace(/\s+/g, " ").trim())
+      .find((text) => text.length >= 2 && text.length <= 120) || document.title || "";
+    return best ? {
+      noteNumber: capturedNoteNumber,
+      noteId,
+      title: heading,
+      detailUrl: location.href,
+      coverImageUrl: best.src,
+      coverAlt: best.alt || "",
+      coverWidth: best.width || best.naturalWidth || 0,
+      coverHeight: best.height || best.naturalHeight || 0,
+      coverSelector: best.selector || "",
+      capturedAt: new Date().toISOString()
+    } : null;
+  }, noteNumber).catch((error) => {
+    console.log(`  [${noteNumber}] capture cover failed: ${error.message}`);
+    return null;
+  });
+}
+
 function renameBrowserSavedFile(config, file, noteNumber, buttonNumber) {
   const target = uniqueDownloadTarget(config, noteNumber, buttonNumber, path.basename(file));
   fs.renameSync(file, target);
@@ -83,6 +206,21 @@ function downloadResult(file) {
   return { ok: true, file };
 }
 
+function isTemporaryDownload(file) {
+  const name = path.basename(file).toLowerCase();
+  return name.endsWith(".crdownload") || name.endsWith(".tmp");
+}
+
+async function waitForNewFiles(dir, before, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    const created = newFilesSince(dir, before).filter((file) => !isTemporaryDownload(file));
+    if (created.length > 0) return created;
+    await sleep(500);
+  }
+  return [];
+}
+
 async function getWorkingPage(browser, config) {
   const context = browser.contexts()[0] || await browser.newContext();
   const pages = context.pages();
@@ -100,10 +238,18 @@ async function getWorkingPage(browser, config) {
   ).catch(() => {});
 
   const client = await context.newCDPSession(page);
-  await client.send("Page.setDownloadBehavior", {
-    behavior: "allow",
-    downloadPath: config.downloadDir
-  });
+  try {
+    await client.send("Page.setDownloadBehavior", {
+      behavior: "allowAndName",
+      downloadPath: config.downloadDir
+    });
+  } catch (error) {
+    console.log(`download behavior allowAndName failed, fallback to allow: ${error.message}`);
+    await client.send("Page.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: config.downloadDir
+    });
+  }
 
   return page;
 }
@@ -121,6 +267,15 @@ async function clickOneExportAttempt(detailPage, config, noteNumber, buttonNumbe
   if (download) {
     const suggested = safeFilename(download.suggestedFilename());
     const target = uniqueDownloadTarget(config, noteNumber, buttonNumber, suggested);
+    const browserSaved = await waitForNewFiles(config.downloadDir, before, config.afterExportWaitMs + 8000);
+    if (browserSaved.length > 0) {
+      const renamed = path.join(config.downloadDir, path.basename(target));
+      fs.renameSync(browserSaved[0], renamed);
+      const result = downloadResult(renamed);
+      if (!result.ok) return result;
+      console.log(`  [${noteNumber}.${buttonNumber}] browser saved and renamed: ${renamed}`);
+      return { ok: true, file: renamed };
+    }
     try {
       await download.saveAs(target);
       const result = downloadResult(target);
@@ -128,8 +283,8 @@ async function clickOneExportAttempt(detailPage, config, noteNumber, buttonNumbe
       console.log(`  [${noteNumber}.${buttonNumber}] 已保存: ${target}`);
       return { ok: true, file: target };
     } catch (error) {
-      await sleep(config.afterExportWaitMs);
-      const created = newFilesSince(config.downloadDir, before);
+      console.log(`  [${noteNumber}.${buttonNumber}] download.saveAs failed: ${error.message}`);
+      const created = await waitForNewFiles(config.downloadDir, before, config.afterExportWaitMs + 5000);
       if (created.length > 0) {
         const renamed = renameBrowserSavedFile(config, created[0], noteNumber, buttonNumber);
         const result = downloadResult(renamed);
@@ -137,12 +292,11 @@ async function clickOneExportAttempt(detailPage, config, noteNumber, buttonNumbe
         console.log(`  [${noteNumber}.${buttonNumber}] 浏览器已保存并重命名: ${renamed}`);
         return { ok: true, file: renamed };
       }
-      throw error;
+      return { ok: false, reason: error.message || "download.saveAs failed", file: target };
     }
   }
 
-  await sleep(config.afterExportWaitMs);
-  const created = newFilesSince(config.downloadDir, before);
+  const created = await waitForNewFiles(config.downloadDir, before, config.afterExportWaitMs);
   if (created.length > 0) {
     const renamed = renameBrowserSavedFile(config, created[0], noteNumber, buttonNumber);
     const result = downloadResult(renamed);
@@ -217,7 +371,14 @@ async function exportNoteByIndex(listPage, config, detailText, index, noteNumber
   ).catch(() => {});
   await sleep(config.slowMoMs);
 
+  const coverRecord = await captureCover(detailPage, noteNumber);
   const result = await clickExports(detailPage, config, noteNumber);
+  if (coverRecord) {
+    saveCoverRecord({
+      ...coverRecord,
+      downloadedFiles: (result.results || []).map((item) => item.file).filter(Boolean)
+    });
+  }
 
   if (openedPage) {
     await openedPage.close().catch(() => {});

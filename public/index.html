@@ -20,10 +20,6 @@
         <nav class="menu">
           <div class="menu-group">
             <div class="menu-label">分析</div>
-            <button class="menu-item" type="button" data-view="overview">
-              <span class="menu-icon">□</span>
-              总览
-            </button>
             <button class="menu-item active" type="button" data-view="lifecycle">
               <span class="menu-icon">↗</span>
               生命周期对比
@@ -36,18 +32,18 @@
               <span class="menu-icon">▽</span>
               漏斗分析
             </button>
+            <button class="menu-item" type="button" data-view="cover">
+              <span class="menu-icon">▣</span>
+              封面分析
+            </button>
             <button class="menu-item" type="button" data-view="notes">
               <span class="menu-icon">≡</span>
-              笔记横向表
+              数据总览
             </button>
           </div>
 
           <div class="menu-group">
-            <div class="menu-label">数据</div>
-            <button class="menu-item" type="button" data-view="import">
-              <span class="menu-icon">↻</span>
-              导入管理
-            </button>
+
           </div>
         </nav>
       </aside>
@@ -104,32 +100,83 @@
             <table class="data-table funnel-table">
               <thead>
                 <tr>
-                  <th>笔记</th>
-                  <th>曝光</th>
-                  <th>观看率</th>
-                  <th>互动率</th>
-                  <th>收藏率</th>
-                  <th>涨粉效率</th>
-                  <th>诊断</th>
+                  <th data-table="funnel" data-sort-key="title">笔记</th>
+                  <th data-table="funnel" data-sort-key="impressions">曝光</th>
+                  <th data-table="funnel" data-sort-key="viewRate">观看曝光比</th>
+                  <th data-table="funnel" data-sort-key="interactionRate">互动率</th>
+                  <th data-table="funnel" data-sort-key="collectRate">收藏率</th>
+                  <th data-table="funnel" data-sort-key="followRate">涨粉效率</th>
+                  <th data-table="funnel" data-sort-key="diagnosis">诊断</th>
                 </tr>
               </thead>
               <tbody id="funnelBody"></tbody>
             </table>
           </div>
+          <div id="funnelPagination" class="pagination-bar"></div>
+        </section>
+
+        <section class="content-card view-panel hidden" data-panel="cover">
+          <div class="panel-head">
+            <div>
+              <h2>封面点击率对比</h2>
+              <p>按平台原始“官方封面点击率”横向比较每篇笔记；观看数÷曝光数单独作为“观看曝光比”展示。</p>
+            </div>
+            <div class="toolbar">
+              <select id="coverSortSelect" class="select-input">
+                <option value="officialCoverClickRate">按官方封面点击率排序</option>
+                <option value="viewExposureRate">按观看曝光比排序</option>
+                <option value="coverClicks">按封面点击估算排序</option>
+                <option value="impressions">按曝光排序</option>
+                <option value="views">按观看排序</option>
+                <option value="interactionRate">按互动率排序</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="cover-layout">
+            <div id="coverChart" class="cover-chart"></div>
+            <aside class="insight-panel">
+              <h3>封面判断</h3>
+              <ul id="coverInsightList"></ul>
+            </aside>
+          </div>
+
+          <div class="table-wrap cover-table-wrap">
+            <table class="data-table cover-table">
+              <thead>
+                <tr>
+                  <th data-table="cover" data-sort-key="title">封面</th>
+                  <th data-table="cover" data-sort-key="title">笔记</th>
+                  <th data-table="cover" data-sort-key="officialCoverClickRate">官方封面点击率</th>
+                  <th data-table="cover" data-sort-key="viewExposureRate">观看曝光比</th>
+                  <th data-table="cover" data-sort-key="coverClicks">封面点击估算</th>
+                  <th data-table="cover" data-sort-key="impressions">曝光</th>
+                  <th data-table="cover" data-sort-key="views">观看</th>
+                  <th data-table="cover" data-sort-key="interactionRate">互动率</th>
+                  <th data-table="cover" data-sort-key="collectRate">收藏率</th>
+                  <th data-table="cover" data-sort-key="diagnostics">诊断</th>
+                </tr>
+              </thead>
+              <tbody id="coverBody"></tbody>
+            </table>
+          </div>
+          <div id="coverPagination" class="pagination-bar"></div>
         </section>
 
         <section class="content-card view-panel hidden" data-panel="notes">
           <div class="panel-head">
             <div>
               <h2>笔记横向对比</h2>
-              <p>按关键指标横向比较每篇笔记，包含观看率、互动率、收藏率、转粉率、传播率等衍生指标。</p>
+              <p>按关键指标横向比较每篇笔记，包含 CES评分（点赞×1 + 收藏×1 + 评论×4 + 分享×4 + 关注/涨粉×8）等衍生指标。</p>
             </div>
             <div class="toolbar">
               <input id="notesCompareSearch" class="search-input" type="search" placeholder="搜索标题、类型或标签" />
               <select id="notesCompareSort" class="select-input">
+                <option value="cesScore">按 CES评分排序</option>
                 <option value="impressions">按曝光排序</option>
                 <option value="views">按观看排序</option>
-                <option value="viewRate">按观看率排序</option>
+                <option value="officialCoverClickRate">按官方封面点击率排序</option>
+                <option value="viewRate">按观看曝光比排序</option>
                 <option value="interactionRate">按互动率排序</option>
                 <option value="collectRate">按收藏率排序</option>
                 <option value="followRate">按转粉率排序</option>
@@ -147,28 +194,31 @@
             <table class="data-table notes-compare-table">
               <thead>
                 <tr>
-                  <th>标题</th>
-                  <th>发布时间</th>
-                  <th>类型</th>
-                  <th>标签</th>
-                  <th>曝光</th>
-                  <th>观看</th>
-                  <th>点击率</th>
-                  <th>平均观看时长</th>
-                  <th>点赞</th>
-                  <th>评论</th>
-                  <th>收藏</th>
-                  <th>分享</th>
-                  <th>涨粉</th>
-                  <th>互动率</th>
-                  <th>转粉率</th>
-                  <th>收藏率</th>
-                  <th>传播率</th>
+                  <th data-table="notes" data-sort-key="title">标题</th>
+                  <th data-table="notes" data-sort-key="publishedAt">发布时间</th>
+                  <th data-table="notes" data-sort-key="type">类型</th>
+                  <th data-table="notes" data-sort-key="labels">标签</th>
+                  <th data-table="notes" data-sort-key="impressions">曝光</th>
+                  <th data-table="notes" data-sort-key="views">观看</th>
+                  <th data-table="notes" data-sort-key="officialCoverClickRate">官方封面点击率</th>
+                  <th data-table="notes" data-sort-key="viewRate">观看曝光比</th>
+                  <th data-table="notes" data-sort-key="avgWatchSeconds">平均观看时长</th>
+                  <th data-table="notes" data-sort-key="likes">点赞</th>
+                  <th data-table="notes" data-sort-key="comments">评论</th>
+                  <th data-table="notes" data-sort-key="collects">收藏</th>
+                  <th data-table="notes" data-sort-key="shares">分享</th>
+                  <th data-table="notes" data-sort-key="followersGained">涨粉</th>
+                  <th data-table="notes" data-sort-key="cesScore">CES评分</th>
+                  <th data-table="notes" data-sort-key="interactionRate">互动率</th>
+                  <th data-table="notes" data-sort-key="followRate">转粉率</th>
+                  <th data-table="notes" data-sort-key="collectRate">收藏率</th>
+                  <th data-table="notes" data-sort-key="spreadRate">传播率</th>
                 </tr>
               </thead>
               <tbody id="notesCompareBody"></tbody>
             </table>
           </div>
+          <div id="notesPagination" class="pagination-bar"></div>
         </section>
 
         <section class="content-card view-panel" data-panel="lifecycle">
@@ -244,17 +294,18 @@
             <table class="data-table publish-table">
               <thead>
                 <tr>
-                  <th>时间段</th>
-                  <th>笔记数</th>
-                  <th>平均曝光</th>
-                  <th>平均互动</th>
-                  <th>平均涨粉效率</th>
-                  <th>代表笔记</th>
+                  <th data-table="publish" data-sort-key="slotLabel">时间段</th>
+                  <th data-table="publish" data-sort-key="noteCount">笔记数</th>
+                  <th data-table="publish" data-sort-key="avgImpressions">平均曝光</th>
+                  <th data-table="publish" data-sort-key="avgInteractions">平均互动</th>
+                  <th data-table="publish" data-sort-key="avgFollowRate">平均涨粉效率</th>
+                  <th data-table="publish" data-sort-key="topNoteTitle">代表笔记</th>
                 </tr>
               </thead>
               <tbody id="publishSlotBody"></tbody>
             </table>
           </div>
+          <div id="publishPagination" class="pagination-bar"></div>
         </section>
 
         <section class="content-card view-panel" data-panel="lifecycle">
@@ -269,21 +320,22 @@
               <thead>
                 <tr>
                   <th class="check-col"></th>
-                  <th>笔记</th>
-                  <th>生命周期判断</th>
-                  <th>24h互动</th>
-                  <th>14天互动</th>
-                  <th>24h占比</th>
-                  <th>7-14天增量</th>
-                  <th>曝光</th>
-                  <th>观看</th>
-                  <th>互动率</th>
-                  <th>收藏率</th>
+                  <th data-table="lifecycle" data-sort-key="title">笔记</th>
+                  <th data-table="lifecycle" data-sort-key="tags">生命周期判断</th>
+                  <th data-table="lifecycle" data-sort-key="m24">24h互动</th>
+                  <th data-table="lifecycle" data-sort-key="m14">14天互动</th>
+                  <th data-table="lifecycle" data-sort-key="earlyShare">24h占比</th>
+                  <th data-table="lifecycle" data-sort-key="uplift">7-14天增量</th>
+                  <th data-table="lifecycle" data-sort-key="impressions">曝光</th>
+                  <th data-table="lifecycle" data-sort-key="views">观看</th>
+                  <th data-table="lifecycle" data-sort-key="interactionRate">互动率</th>
+                  <th data-table="lifecycle" data-sort-key="collectRate">收藏率</th>
                 </tr>
               </thead>
               <tbody id="notesBody"></tbody>
             </table>
           </div>
+          <div id="lifecyclePagination" class="pagination-bar"></div>
         </section>
       </main>
     </div>

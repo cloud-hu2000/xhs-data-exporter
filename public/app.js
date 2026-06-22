@@ -7,13 +7,22 @@ const state = {
   chartMetric: "interactions",
   publishMetric: "impressions",
   funnelNoteKey: "",
+  coverSort: "officialCoverClickRate",
   notesCompareSearch: "",
-  notesCompareSort: "impressions",
+  notesCompareSort: "cesScore",
   notesCompareTag: "all",
+  tables: {
+    lifecycle: { page: 1, pageSize: 10, sortKey: "m14", sortDir: "desc" },
+    publish: { page: 1, pageSize: 10, sortKey: "avgImpressions", sortDir: "desc" },
+    funnel: { page: 1, pageSize: 10, sortKey: "impressions", sortDir: "desc" },
+    cover: { page: 1, pageSize: 10, sortKey: "officialCoverClickRate", sortDir: "desc" },
+    notes: { page: 1, pageSize: 10, sortKey: "cesScore", sortDir: "desc" }
+  },
   view: "lifecycle",
   chart: null,
   publishChart: null,
-  funnelChart: null
+  funnelChart: null,
+  coverChart: null
 };
 
 const MILESTONES = ["1h", "6h", "24h", "3d", "7d", "14d"];
@@ -34,11 +43,13 @@ const PUBLISH_METRIC_LABELS = {
   interactions: "平均互动",
   followRate: "平均涨粉效率"
 };
+const MIN_DIAGNOSTIC_VIEWS = 100;
 
 const VIEW_META = {
   lifecycle: ["数据看板 / 生命周期对比", "笔记生命周期对比"],
   publish: ["数据看板 / 发布时间分析", "发布时间分析"],
   funnel: ["数据看板 / 漏斗分析", "漏斗分析"],
+  cover: ["数据看板 / 封面分析", "封面分析"],
   notes: ["数据看板 / 笔记横向对比", "笔记横向对比"]
 };
 
@@ -50,9 +61,24 @@ function formatPct(value) {
   return `${((value || 0) * 100).toFixed(1)}%`;
 }
 
+function formatOptionalNumber(value) {
+  return value == null ? "-" : formatNumber(value);
+}
+
+function formatOptionalPct(value) {
+  return value == null ? "-" : formatPct(value);
+}
+
 function metricFormatter(metric, value) {
   if (metric.endsWith("Rate")) return formatPct(value);
   return formatNumber(value);
+}
+
+function normalizeRate(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return 0;
+  const rate = number > 1 ? number / 100 : number;
+  return Math.min(1, Math.max(0, rate));
 }
 
 function escapeHtml(value) {
@@ -63,44 +89,247 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
+function tagClass(label) {
+  if (String(label).includes("样本不足")) return "warning";
+  if (label === "待观察") return "";
+  return "strong";
+}
+
+function tableState(tableId) {
+  return state.tables[tableId];
+}
+
+function compareValues(a, b) {
+  const valueA = a instanceof Date ? a.getTime() : a;
+  const valueB = b instanceof Date ? b.getTime() : b;
+  const emptyA = valueA == null || valueA === "";
+  const emptyB = valueB == null || valueB === "";
+  if (emptyA && emptyB) return 0;
+  if (emptyA) return -1;
+  if (emptyB) return 1;
+
+  const numberA = Number(valueA);
+  const numberB = Number(valueB);
+  if (Number.isFinite(numberA) && Number.isFinite(numberB)) {
+    return numberA - numberB;
+  }
+
+  return String(valueA).localeCompare(String(valueB), "zh-CN", { numeric: true, sensitivity: "base" });
+}
+
+function sortRows(rows, tableId, getters = {}) {
+  const config = tableState(tableId);
+  if (!config) return rows;
+  const getter = getters[config.sortKey] || ((row) => row[config.sortKey]);
+  const direction = config.sortDir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => compareValues(getter(a), getter(b)) * direction);
+}
+
+function paginatedRows(rows, tableId) {
+  const config = tableState(tableId);
+  if (!config) return rows;
+  const totalPages = Math.max(1, Math.ceil(rows.length / config.pageSize));
+  config.page = Math.min(Math.max(1, config.page), totalPages);
+  const start = (config.page - 1) * config.pageSize;
+  return rows.slice(start, start + config.pageSize);
+}
+
+function resetTablePage(tableId) {
+  const config = tableState(tableId);
+  if (config) config.page = 1;
+}
+
+function setTableSort(tableId, sortKey, renderDirection = true) {
+  const config = tableState(tableId);
+  if (!config) return;
+  if (config.sortKey === sortKey) {
+    config.sortDir = config.sortDir === "asc" ? "desc" : "asc";
+  } else {
+    config.sortKey = sortKey;
+    config.sortDir = renderDirection ? "desc" : "asc";
+  }
+  resetTablePage(tableId);
+  syncSortSelect(tableId);
+  renderTableById(tableId);
+}
+
+function setTableSortFromSelect(tableId, sortKey) {
+  const config = tableState(tableId);
+  if (!config) return;
+  config.sortKey = sortKey;
+  config.sortDir = "desc";
+  resetTablePage(tableId);
+  syncSortSelect(tableId);
+  renderTableById(tableId);
+}
+
+function syncSortSelect(tableId) {
+  if (tableId === "lifecycle") {
+    const sortKey = tableState(tableId).sortKey;
+    const select = document.getElementById("sortSelect");
+    if (select && [...select.options].some((option) => option.value === sortKey)) {
+      state.sort = sortKey;
+      select.value = sortKey;
+    }
+  }
+  if (tableId === "cover") {
+    const sortKey = tableState(tableId).sortKey;
+    const select = document.getElementById("coverSortSelect");
+    if (select && [...select.options].some((option) => option.value === sortKey)) {
+      state.coverSort = sortKey;
+      select.value = sortKey;
+    }
+  }
+  if (tableId === "notes") {
+    const sortKey = tableState(tableId).sortKey;
+    const select = document.getElementById("notesCompareSort");
+    if (select && [...select.options].some((option) => option.value === sortKey)) {
+      state.notesCompareSort = sortKey;
+      select.value = sortKey;
+    }
+  }
+}
+
+function updateSortHeaders(tableId) {
+  const config = tableState(tableId);
+  if (!config) return;
+  document.querySelectorAll(`th[data-table="${tableId}"][data-sort-key]`).forEach((header) => {
+    const active = header.dataset.sortKey === config.sortKey;
+    header.classList.toggle("sorted", active);
+    header.setAttribute("aria-sort", active ? (config.sortDir === "asc" ? "ascending" : "descending") : "none");
+    let indicator = header.querySelector(".sort-indicator");
+    if (!indicator) {
+      indicator = document.createElement("span");
+      indicator.className = "sort-indicator";
+      header.appendChild(indicator);
+    }
+    indicator.textContent = active ? (config.sortDir === "asc" ? "↑" : "↓") : "↕";
+  });
+}
+
+function renderPagination(tableId, totalRows) {
+  const container = document.getElementById(`${tableId}Pagination`);
+  const config = tableState(tableId);
+  if (!container || !config) return;
+  const totalPages = Math.max(1, Math.ceil(totalRows / config.pageSize));
+  config.page = Math.min(Math.max(1, config.page), totalPages);
+  const start = totalRows === 0 ? 0 : (config.page - 1) * config.pageSize + 1;
+  const end = Math.min(totalRows, config.page * config.pageSize);
+  container.innerHTML = `
+    <div class="pagination-info">显示 ${formatNumber(start)}-${formatNumber(end)} / 共 ${formatNumber(totalRows)} 条</div>
+    <div class="pagination-controls">
+      <label>
+        每页
+        <select class="page-size-select" data-table="${tableId}" data-page-size>
+          ${[5, 10, 20, 50].map((size) => `<option value="${size}" ${size === config.pageSize ? "selected" : ""}>${size}</option>`).join("")}
+        </select>
+      </label>
+      <button class="button page-button" type="button" data-table="${tableId}" data-page-action="prev" ${config.page <= 1 ? "disabled" : ""}>上一页</button>
+      <span class="page-current">第 ${formatNumber(config.page)} / ${formatNumber(totalPages)} 页</span>
+      <button class="button page-button" type="button" data-table="${tableId}" data-page-action="next" ${config.page >= totalPages ? "disabled" : ""}>下一页</button>
+    </div>
+  `;
+}
+
+function renderTableById(tableId) {
+  if (tableId === "lifecycle") renderTable();
+  if (tableId === "publish") renderPublishTable();
+  if (tableId === "funnel") renderFunnelTable();
+  if (tableId === "cover") renderCoverTable();
+  if (tableId === "notes") renderNotesCompareTable();
+}
+
 function milestoneMap(noteKey) {
   const rows = state.data.lifecycleMilestones.filter((row) => row.noteKey === noteKey);
   return Object.fromEntries(rows.map((row) => [row.milestone, row]));
 }
 
 function milestoneValue(noteKey, milestone, metric) {
-  return milestoneMap(noteKey)[milestone]?.[metric] || 0;
+  const row = milestoneMap(noteKey)[milestone];
+  if (!row) return null;
+  return row[`${metric}Status`] === "complete" ? row[metric] : null;
+}
+
+function milestoneStatus(noteKey, milestone, metric) {
+  return milestoneMap(noteKey)[milestone]?.[`${metric}Status`] || "missing";
+}
+
+function milestoneRawValue(noteKey, milestone, metric) {
+  return milestoneMap(noteKey)[milestone]?.[`${metric}Raw`] ?? null;
+}
+
+function milestoneDisplayValue(noteKey, milestone, metric) {
+  const status = milestoneStatus(noteKey, milestone, metric);
+  const value = milestoneValue(noteKey, milestone, metric);
+  if (status === "complete") return value;
+  if (status === "partial") return milestoneRawValue(noteKey, milestone, metric);
+  return null;
+}
+
+function isCompleteValue(value) {
+  return value != null && Number.isFinite(Number(value));
+}
+
+function formatLifecycleValue(value, status, formatter = formatNumber, rawValue = null) {
+  if (status === "missing") return `<div class="metric-main muted-value">暂无数据</div>`;
+  if (status === "partial") {
+    if (rawValue == null) return `<div class="metric-main warn-value">数据未完整</div>`;
+    return `
+      <div class="metric-main warn-value">${formatter(rawValue)}</div>
+      <div class="metric-sub warn-sub">数据未完整</div>
+    `;
+  }
+  return `<div class="metric-main">${formatter(value)}</div>`;
 }
 
 function lifecycleProfile(note) {
   const m24 = milestoneValue(note.noteKey, "24h", "interactions");
   const m7 = milestoneValue(note.noteKey, "7d", "interactions");
-  const m14 = milestoneValue(note.noteKey, "14d", "interactions") || note.interactions || 0;
-  const views14 = milestoneValue(note.noteKey, "14d", "views") || note.views || 0;
-  const impressions14 = milestoneValue(note.noteKey, "14d", "impressions") || note.impressions || 0;
+  const m14 = milestoneValue(note.noteKey, "14d", "interactions");
+  const m24Raw = milestoneRawValue(note.noteKey, "24h", "interactions");
+  const m7Raw = milestoneRawValue(note.noteKey, "7d", "interactions");
+  const m14Raw = milestoneRawValue(note.noteKey, "14d", "interactions");
+  const views14 = milestoneValue(note.noteKey, "14d", "views");
+  const impressions14 = milestoneValue(note.noteKey, "14d", "impressions");
   const firstDayViews = milestoneValue(note.noteKey, "24h", "views");
   const firstDayImpressions = milestoneValue(note.noteKey, "24h", "impressions");
-  const earlyShare = m14 ? m24 / m14 : 0;
-  const tailShare = m14 ? Math.max(0, m14 - m7) / m14 : 0;
-  const firstDayViewRate = firstDayImpressions ? firstDayViews / firstDayImpressions : 0;
+  const hasM24 = isCompleteValue(m24);
+  const hasM7 = isCompleteValue(m7);
+  const hasM14 = isCompleteValue(m14);
+  const earlyShare = hasM24 && hasM14 && m14 ? m24 / m14 : null;
+  const tailShare = hasM7 && hasM14 && m14 ? Math.max(0, m14 - m7) / m14 : null;
+  const firstDayViewRate = isCompleteValue(firstDayViews) && isCompleteValue(firstDayImpressions) && firstDayImpressions ? firstDayViews / firstDayImpressions : null;
 
   const tags = [];
-  if (m24 >= 20 || earlyShare >= 0.45) tags.push("启动快");
-  if (tailShare >= 0.18) tags.push("后劲强");
-  if (earlyShare >= 0.72 && tailShare <= 0.08) tags.push("衰减快");
-  if (tailShare >= 0.12 && firstDayViewRate >= 0.12) tags.push("长尾流量");
-  if (tags.length === 0) tags.push("待观察");
+  if (!hasM24 || !hasM7 || !hasM14) {
+    tags.push("数据未完整");
+  } else {
+    if (m24 >= 20 || earlyShare >= 0.45) tags.push("启动快");
+    if (tailShare >= 0.18) tags.push("后劲强");
+    if (earlyShare >= 0.72 && tailShare <= 0.08) tags.push("衰减快");
+    if (tailShare >= 0.12 && firstDayViewRate >= 0.12) tags.push("长尾流量");
+    if (tags.length === 0) tags.push("待观察");
+  }
 
   return {
     tags,
     m24,
     m7,
     m14,
+    m24Raw,
+    m7Raw,
+    m14Raw,
+    m24Display: milestoneDisplayValue(note.noteKey, "24h", "interactions"),
+    m7Display: milestoneDisplayValue(note.noteKey, "7d", "interactions"),
+    m14Display: milestoneDisplayValue(note.noteKey, "14d", "interactions"),
     views14,
     impressions14,
     earlyShare,
     tailShare,
-    firstDayViewRate
+    firstDayViewRate,
+    m24Status: milestoneStatus(note.noteKey, "24h", "interactions"),
+    m7Status: milestoneStatus(note.noteKey, "7d", "interactions"),
+    m14Status: milestoneStatus(note.noteKey, "14d", "interactions")
   };
 }
 
@@ -239,6 +468,13 @@ function funnelDiagnostics(note) {
   const comments = note.comments || 0;
   const items = [];
 
+  if ((note.views || 0) < MIN_DIAGNOSTIC_VIEWS) {
+    return [{
+      type: "! 样本不足",
+      detail: `当前观看数 ${formatNumber(note.views || 0)}，低于 ${formatNumber(MIN_DIAGNOSTIC_VIEWS)}，比例容易失真，暂不做强诊断。`
+    }];
+  }
+
   if (rates.impressions >= 800 && rates.viewRate < 0.1) {
     items.push({
       type: "高曝光低点击",
@@ -297,11 +533,20 @@ function selectedFunnelNote() {
 }
 
 function noteContentType(note) {
+  if ((note.views || 0) < MIN_DIAGNOSTIC_VIEWS) return "样本不足";
   if ((note.collectRate || 0) >= 0.04 || (note.collects || 0) >= 20) return "工具/资料";
   if ((note.commentRate || 0) >= 0.01 || (note.comments || 0) >= 2) return "观点/讨论";
   if ((note.followRate || 0) >= 0.004 || (note.followersGained || 0) > 0) return "涨粉型";
   if ((note.viewRate || 0) >= 0.15) return "点击型";
   return "常规笔记";
+}
+
+function cesScoreFor(note) {
+  return (note.likes || 0)
+    + (note.collects || 0)
+    + (note.comments || 0) * 4
+    + (note.shares || 0) * 4
+    + (note.followersGained || 0) * 8;
 }
 
 function noteCompareRecord(note) {
@@ -331,6 +576,7 @@ function noteCompareRecord(note) {
     labels,
     impressions,
     views,
+    officialCoverClickRate: officialCoverClickRate(note),
     viewRate: impressions ? views / impressions : 0,
     avgWatchSeconds: note.avgWatchSeconds || 0,
     likes,
@@ -338,6 +584,7 @@ function noteCompareRecord(note) {
     collects,
     shares,
     followersGained,
+    cesScore: note.cesScore ?? cesScoreFor(note),
     interactionRate: views ? interactions / views : 0,
     followRate: views ? followersGained / views : 0,
     collectRate: views ? collects / views : 0,
@@ -347,23 +594,183 @@ function noteCompareRecord(note) {
 
 function notesCompareRecords() {
   const query = state.notesCompareSearch.trim().toLowerCase();
-  return state.data.notes
+  const rows = state.data.notes
     .map(noteCompareRecord)
     .filter((record) => {
       if (state.notesCompareTag !== "all" && !record.labels.includes(state.notesCompareTag)) return false;
       if (!query) return true;
       return `${record.title} ${record.type} ${record.labels.join(" ")}`.toLowerCase().includes(query);
-    })
-    .sort((a, b) => {
-      if (state.notesCompareSort === "publishedAt") {
-        return (b.publishedAt?.getTime() || 0) - (a.publishedAt?.getTime() || 0);
-      }
-      return Number(b[state.notesCompareSort] || 0) - Number(a[state.notesCompareSort] || 0);
     });
+  return sortRows(rows, "notes", {
+    labels: (record) => record.labels.join(" ")
+  });
 }
 
 function allCompareTags() {
   return [...new Set(state.data.notes.flatMap((note) => noteCompareRecord(note).labels))].filter(Boolean).sort();
+}
+
+function officialCoverClickRate(note) {
+  const hasOfficialValue = note.hasOfficialCoverClickRate || Number(note.coverClickRatePct || 0) > 0;
+  if (!hasOfficialValue) return null;
+  return normalizeRate(note.coverClickRatePct);
+}
+
+function coverRecord(note) {
+  const impressions = Math.max(0, note.impressions || 0);
+  const views = Math.max(0, note.views || 0);
+  const officialRate = officialCoverClickRate(note);
+  const viewExposureRate = impressions ? views / impressions : 0;
+  const coverClicks = officialRate == null ? null : Math.round(impressions * officialRate);
+  const interactionRate = note.interactionRate || 0;
+  const collectRate = note.collectRate || 0;
+  const diagnostics = [];
+  const smallSample = views < MIN_DIAGNOSTIC_VIEWS;
+
+  if (smallSample) {
+    diagnostics.push("! 样本不足");
+  } else {
+    if (officialRate != null && impressions >= 800 && officialRate < 0.1) diagnostics.push("高曝光低点击");
+    if (officialRate != null && officialRate >= 0.15) diagnostics.push("封面吸引力强");
+    if (officialRate != null && officialRate >= 0.12 && interactionRate < 0.04) diagnostics.push("点击强内容弱");
+    if (officialRate != null && officialRate < 0.08 && interactionRate >= 0.08) diagnostics.push("内容潜力大");
+    if (officialRate == null) diagnostics.push("缺少官方封面点击率");
+  }
+  if (diagnostics.length === 0) diagnostics.push("待观察");
+
+  return {
+    note,
+    title: note.title || "",
+    coverImageUrl: note.coverImageUrl || "",
+    coverAlt: note.coverAlt || note.title || "",
+    officialCoverClickRate: officialRate,
+    officialCoverClickRatePct: officialRate == null ? null : officialRate * 100,
+    viewExposureRate,
+    viewExposureRatePct: viewExposureRate * 100,
+    coverClicks,
+    impressions,
+    views,
+    interactionRate,
+    collectRate,
+    smallSample,
+    diagnostics,
+    diagnosticsText: diagnostics.join(" ")
+  };
+}
+
+function coverRecords() {
+  return sortRows(state.data.notes.map(coverRecord), "cover", {
+    diagnostics: (record) => record.diagnosticsText
+  });
+}
+
+function coverThumb(record) {
+  if (record.coverImageUrl) {
+    return `<img src="${escapeHtml(record.coverImageUrl)}" alt="${escapeHtml(record.coverAlt)}" loading="lazy" referrerpolicy="no-referrer" />`;
+  }
+  return `<div class="cover-placeholder">${escapeHtml(shortTitle(record.title).slice(0, 8))}</div>`;
+}
+
+function renderCoverChart() {
+  const element = document.getElementById("coverChart");
+  if (!element) return;
+  if (!state.coverChart) {
+    state.coverChart = echarts.init(element, null, { renderer: "canvas" });
+    window.addEventListener("resize", () => state.coverChart.resize());
+  }
+
+  const rows = coverRecords().filter((row) => row.officialCoverClickRate != null).slice(0, 12).reverse();
+  state.coverChart.setOption({
+    color: ["#c73535", "#2374d5"],
+    grid: { left: 132, right: 30, top: 34, bottom: 36 },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params) => {
+        const row = rows[params[0].dataIndex];
+        return `${escapeHtml(row.title)}<br/>官方封面点击率：${formatOptionalPct(row.officialCoverClickRate)}<br/>观看曝光比：${formatPct(row.viewExposureRate)}<br/>曝光：${formatNumber(row.impressions)}<br/>观看：${formatNumber(row.views)}`;
+      }
+    },
+    xAxis: {
+      type: "value",
+      axisLabel: { color: "#65717e", formatter: (value) => `${value}%` },
+      splitLine: { lineStyle: { color: "#edf1f4" } }
+    },
+    yAxis: {
+      type: "category",
+      data: rows.map((row) => shortTitle(row.title)),
+      axisLabel: { color: "#4c5a66", width: 118, overflow: "truncate" },
+      axisLine: { lineStyle: { color: "#dbe2e8" } }
+    },
+    series: [{
+      name: "官方封面点击率",
+      type: "bar",
+      barWidth: 14,
+      data: rows.map((row) => Number(row.officialCoverClickRatePct.toFixed(2))),
+      label: {
+        show: true,
+        position: "right",
+        formatter: (params) => `${params.value.toFixed(1)}%`
+      },
+      itemStyle: { borderRadius: [0, 4, 4, 0] }
+    }]
+  }, true);
+}
+
+function renderCoverInsights() {
+  const list = document.getElementById("coverInsightList");
+  if (!list) return;
+  const rows = coverRecords();
+  const rowsWithOfficialRate = rows.filter((row) => row.officialCoverClickRate != null);
+  const officialRows = rowsWithOfficialRate.filter((row) => !row.smallSample);
+  const best = officialRows[0];
+  const weak = [...officialRows].filter((row) => row.impressions >= 800).sort((a, b) => a.officialCoverClickRate - b.officialCoverClickRate)[0];
+  const avgRate = officialRows.length ? officialRows.reduce((sum, row) => sum + row.officialCoverClickRate, 0) / officialRows.length : 0;
+  const withImageCount = rows.filter((row) => row.coverImageUrl).length;
+  const smallSampleCount = rows.filter((row) => row.smallSample).length;
+  const items = [
+    best && `当前官方封面点击率最高：${shortTitle(best.title)}，${formatPct(best.officialCoverClickRate)}，曝光 ${formatNumber(best.impressions)}。`,
+    weak && weak !== best && `高曝光低点击优先复盘：${shortTitle(weak.title)}，官方封面点击率 ${formatPct(weak.officialCoverClickRate)}，适合先改封面/标题钩子。`,
+    officialRows.length
+      ? `样本平均官方封面点击率 ${formatPct(avgRate)}；观看曝光比单独展示，不再替代平台原始字段。`
+      : (rowsWithOfficialRate.length ? "当前有官方封面点击率，但有效样本观看数不足，暂不生成封面强判断。" : "当前数据缺少平台原始封面点击率；请重新导入包含该字段的基础数据明细表。"),
+    smallSampleCount > 0 && `${formatNumber(smallSampleCount)} 篇笔记观看数低于 ${formatNumber(MIN_DIAGNOSTIC_VIEWS)}，已标记样本不足并暂停强诊断。`,
+    withImageCount ? `已匹配到 ${formatNumber(withImageCount)} 张封面图，可直接做视觉对比。` : "当前旧数据还没有封面图；重新运行导出后会尝试从详情页记录封面 URL。"
+  ].filter(Boolean);
+  list.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function renderCoverTable() {
+  const tbody = document.getElementById("coverBody");
+  if (!tbody) return;
+  const rows = coverRecords();
+  const pageRows = paginatedRows(rows, "cover");
+  tbody.innerHTML = pageRows.map((record) => `
+    <tr>
+      <td>${coverThumb(record)}</td>
+      <td><div class="note-title">${escapeHtml(record.title)}</div></td>
+      <td><div class="metric-main">${formatOptionalPct(record.officialCoverClickRate)}</div></td>
+      <td><div class="metric-main">${formatPct(record.viewExposureRate)}</div><div class="metric-sub">${formatNumber(record.views)} / ${formatNumber(record.impressions)}</div></td>
+      <td><div class="metric-main">${formatOptionalNumber(record.coverClicks)}</div></td>
+      <td><div class="metric-main">${formatNumber(record.impressions)}</div></td>
+      <td><div class="metric-main">${formatNumber(record.views)}</div></td>
+      <td><div class="metric-main">${formatPct(record.interactionRate)}</div></td>
+      <td><div class="metric-main">${formatPct(record.collectRate)}</div></td>
+      <td>
+        <div class="tags">
+          ${record.diagnostics.map((item) => `<span class="tag ${tagClass(item)}">${escapeHtml(item)}</span>`).join("")}
+        </div>
+      </td>
+    </tr>
+  `).join("");
+  renderPagination("cover", rows.length);
+  updateSortHeaders("cover");
+}
+
+function renderCoverAnalysis() {
+  renderCoverChart();
+  renderCoverInsights();
+  renderCoverTable();
 }
 
 function renderSummary() {
@@ -390,7 +797,16 @@ function renderLifecycleChart() {
     smooth: true,
     symbolSize: 7,
     emphasis: { focus: "series" },
-    data: MILESTONES.map((milestone) => milestoneValue(note.noteKey, milestone, metric))
+    data: MILESTONES.map((milestone) => {
+      const status = milestoneStatus(note.noteKey, milestone, metric);
+      const value = milestoneDisplayValue(note.noteKey, milestone, metric);
+      if (value == null) return null;
+      return {
+        value,
+        lifecycleStatus: status,
+        itemStyle: status === "partial" ? { opacity: 0.45, borderType: "dashed" } : undefined
+      };
+    })
   }));
 
   state.chart.setOption({
@@ -398,7 +814,17 @@ function renderLifecycleChart() {
     grid: { left: 54, right: 24, top: 42, bottom: 70 },
     tooltip: {
       trigger: "axis",
-      valueFormatter: (value) => metricFormatter(metric, value)
+      formatter: (params) => {
+        const title = params[0]?.axisValueLabel || "";
+        const lines = params
+          .filter((item) => item.value != null)
+          .map((item) => {
+            const status = item.data?.lifecycleStatus;
+            const suffix = status === "partial" ? "（数据未完整，仅已记录）" : "";
+            return `${item.marker}${escapeHtml(item.seriesName)}：${metricFormatter(metric, item.value)}${suffix}`;
+          });
+        return [title, ...lines].join("<br/>");
+      }
     },
     legend: {
       bottom: 14,
@@ -429,14 +855,17 @@ function renderLifecycleChart() {
 
 function renderInsights() {
   const notes = state.data.notes;
-  const fastest = [...notes].sort((a, b) => lifecycleProfile(b).m24 - lifecycleProfile(a).m24)[0];
-  const strongestTail = [...notes].sort((a, b) => lifecycleProfile(b).tailShare - lifecycleProfile(a).tailShare)[0];
+  const completeM24 = notes.filter((note) => isCompleteValue(lifecycleProfile(note).m24));
+  const completeTail = notes.filter((note) => isCompleteValue(lifecycleProfile(note).tailShare));
+  const fastest = [...completeM24].sort((a, b) => lifecycleProfile(b).m24 - lifecycleProfile(a).m24)[0];
+  const strongestTail = [...completeTail].sort((a, b) => lifecycleProfile(b).tailShare - lifecycleProfile(a).tailShare)[0];
   const fastestProfile = fastest ? lifecycleProfile(fastest) : null;
   const tailProfile = strongestTail ? lifecycleProfile(strongestTail) : null;
 
   const items = [
     fastest && `启动最快：${shortTitle(fastest.title)}，24小时互动 ${formatNumber(fastestProfile.m24)}。`,
     strongestTail && `后劲最强：${shortTitle(strongestTail.title)}，7-14天互动增量占比 ${formatPct(tailProfile.tailShare)}。`,
+    (!fastest || !strongestTail) && "部分笔记的时间序列窗口未完整覆盖，已停止参与生命周期判断。",
     "曝光/观看的 1小时、6小时数据官方导出未提供，早期判断优先看互动、收藏、评论、涨粉。",
     "曲线前段陡说明启动快；后段继续上扬说明有长尾搜索或持续推荐。"
   ].filter(Boolean);
@@ -444,13 +873,41 @@ function renderInsights() {
   document.getElementById("insightList").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
 
+function lifecycleTableRecords() {
+  return filteredNotes().map((note) => {
+    const profile = lifecycleProfile(note);
+    const uplift = isCompleteValue(profile.m14) && isCompleteValue(profile.m7) ? Math.max(0, profile.m14 - profile.m7) : null;
+    return {
+      note,
+      profile,
+      title: note.title || "",
+      tagsText: profile.tags.join(" "),
+      m24: profile.m24Display,
+      m14: profile.m14Display,
+      earlyShare: profile.earlyShare,
+      uplift,
+      tailShare: profile.tailShare,
+      impressions: note.impressions || 0,
+      views: note.views || 0,
+      interactions: note.interactions || 0,
+      interactionRate: note.interactionRate || 0,
+      collectRate: note.collectRate || 0
+    };
+  });
+}
+
 function renderTable() {
   const tbody = document.getElementById("notesBody");
-  const rows = filteredNotes();
+  if (!tbody) return;
+  const rows = sortRows(lifecycleTableRecords(), "lifecycle", {
+    tags: (record) => record.tagsText
+  });
+  const pageRows = paginatedRows(rows, "lifecycle");
 
-  tbody.innerHTML = rows.map((note) => {
-    const profile = lifecycleProfile(note);
-    const uplift = Math.max(0, profile.m14 - profile.m7);
+  tbody.innerHTML = pageRows.map((record) => {
+    const { note, profile, uplift } = record;
+    const upliftStatus = isCompleteValue(uplift) ? "complete" : (profile.m7Status === "missing" || profile.m14Status === "missing" ? "missing" : "partial");
+    const earlyShareStatus = isCompleteValue(profile.earlyShare) ? "complete" : (profile.m24Status === "missing" || profile.m14Status === "missing" ? "missing" : "partial");
     return `
       <tr>
         <td class="check-col">
@@ -462,13 +919,13 @@ function renderTable() {
         </td>
         <td>
           <div class="tags">
-            ${profile.tags.map((tag) => `<span class="tag ${tag === "待观察" ? "" : "strong"}">${tag}</span>`).join("")}
+            ${profile.tags.map((tag) => `<span class="tag ${tagClass(tag)}">${tag}</span>`).join("")}
           </div>
         </td>
-        <td><div class="metric-main">${formatNumber(profile.m24)}</div></td>
-        <td><div class="metric-main">${formatNumber(profile.m14)}</div></td>
-        <td><div class="metric-main">${formatPct(profile.earlyShare)}</div></td>
-        <td><div class="metric-main">${formatNumber(uplift)}</div><div class="metric-sub">${formatPct(profile.tailShare)}</div></td>
+        <td>${formatLifecycleValue(profile.m24, profile.m24Status, formatNumber, profile.m24Raw)}</td>
+        <td>${formatLifecycleValue(profile.m14, profile.m14Status, formatNumber, profile.m14Raw)}</td>
+        <td>${formatLifecycleValue(profile.earlyShare, earlyShareStatus, formatPct)}</td>
+        <td>${formatLifecycleValue(uplift, upliftStatus)}<div class="metric-sub">${isCompleteValue(profile.tailShare) ? formatPct(profile.tailShare) : ""}</div></td>
         <td><div class="metric-main">${formatNumber(note.impressions)}</div></td>
         <td><div class="metric-main">${formatNumber(note.views)}</div></td>
         <td><div class="metric-main">${formatPct(note.interactionRate)}</div></td>
@@ -492,6 +949,8 @@ function renderTable() {
       renderLifecycleChart();
     });
   });
+  renderPagination("lifecycle", rows.length);
+  updateSortHeaders("lifecycle");
 }
 
 function renderPublishHeatmap() {
@@ -602,9 +1061,15 @@ function renderPublishTable() {
   if (!tbody) return;
   const rows = publishSlots()
     .filter((slot) => slot.noteCount > 0)
-    .sort((a, b) => slotMetricValue(b, state.publishMetric) - slotMetricValue(a, state.publishMetric));
+    .map((slot) => ({
+      ...slot,
+      slotLabel: formatPublishSlot(slot),
+      topNoteTitle: slot.topNote ? slot.topNote.title : ""
+    }));
+  const sortedRows = sortRows(rows, "publish");
+  const pageRows = paginatedRows(sortedRows, "publish");
 
-  tbody.innerHTML = rows.map((slot) => `
+  tbody.innerHTML = pageRows.map((slot) => `
     <tr>
       <td>${formatPublishSlot(slot)}</td>
       <td><div class="metric-main">${formatNumber(slot.noteCount)}</div></td>
@@ -614,6 +1079,8 @@ function renderPublishTable() {
       <td><div class="note-title">${slot.topNote ? shortTitle(slot.topNote.title) : "-"}</div></td>
     </tr>
   `).join("");
+  renderPagination("publish", sortedRows.length);
+  updateSortHeaders("publish");
 }
 
 function renderPublishAnalysis() {
@@ -696,7 +1163,7 @@ function renderFunnelInsights() {
   const rates = funnelRates(note);
   const diagnostics = funnelDiagnostics(note);
   const items = [
-    `观看率 ${formatPct(rates.viewRate)}，互动率 ${formatPct(rates.interactionRate)}，收藏/互动 ${formatPct(rates.collectRate)}，涨粉效率 ${formatPct(rates.followRate)}。`,
+    `观看曝光比 ${formatPct(rates.viewRate)}，互动率 ${formatPct(rates.interactionRate)}，收藏/互动 ${formatPct(rates.collectRate)}，涨粉效率 ${formatPct(rates.followRate)}。`,
     ...diagnostics.map((item) => `${item.type}：${item.detail}`)
   ];
   list.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
@@ -705,21 +1172,35 @@ function renderFunnelInsights() {
 function renderFunnelTable() {
   const tbody = document.getElementById("funnelBody");
   if (!tbody) return;
-  const rows = [...state.data.notes].sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
-  tbody.innerHTML = rows.map((note) => {
+  const rows = state.data.notes.map((note) => {
     const rates = funnelRates(note);
     const diagnostics = funnelDiagnostics(note);
+    return {
+      note,
+      title: note.title || "",
+      diagnostics,
+      diagnosisText: diagnostics.map((item) => item.type).join(" "),
+      ...rates
+    };
+  });
+  const sortedRows = sortRows(rows, "funnel", {
+    diagnosis: (record) => record.diagnosisText
+  });
+  const pageRows = paginatedRows(sortedRows, "funnel");
+
+  tbody.innerHTML = pageRows.map((record) => {
+    const { note, diagnostics } = record;
     return `
       <tr data-note="${note.noteKey}">
         <td><div class="note-title">${note.title}</div></td>
-        <td><div class="metric-main">${formatNumber(rates.impressions)}</div></td>
-        <td><div class="metric-main">${formatPct(rates.viewRate)}</div><div class="metric-sub">${formatNumber(rates.views)} 观看</div></td>
-        <td><div class="metric-main">${formatPct(rates.interactionRate)}</div><div class="metric-sub">${formatNumber(rates.interactions)} 互动</div></td>
-        <td><div class="metric-main">${formatPct(rates.collectRate)}</div><div class="metric-sub">${formatNumber(rates.collects)} 收藏</div></td>
-        <td><div class="metric-main">${formatPct(rates.followRate)}</div><div class="metric-sub">${formatNumber(rates.followersGained)} 涨粉</div></td>
+        <td><div class="metric-main">${formatNumber(record.impressions)}</div></td>
+        <td><div class="metric-main">${formatPct(record.viewRate)}</div><div class="metric-sub">${formatNumber(record.views)} 观看</div></td>
+        <td><div class="metric-main">${formatPct(record.interactionRate)}</div><div class="metric-sub">${formatNumber(record.interactions)} 互动</div></td>
+        <td><div class="metric-main">${formatPct(record.collectRate)}</div><div class="metric-sub">${formatNumber(record.collects)} 收藏</div></td>
+        <td><div class="metric-main">${formatPct(record.followRate)}</div><div class="metric-sub">${formatNumber(record.followersGained)} 涨粉</div></td>
         <td>
           <div class="tags">
-            ${diagnostics.map((item) => `<span class="tag ${item.type === "待观察" ? "" : "strong"}">${item.type}</span>`).join("")}
+            ${diagnostics.map((item) => `<span class="tag ${tagClass(item.type)}">${item.type}</span>`).join("")}
           </div>
         </td>
       </tr>
@@ -733,6 +1214,8 @@ function renderFunnelTable() {
       renderView();
     });
   });
+  renderPagination("funnel", sortedRows.length);
+  updateSortHeaders("funnel");
 }
 
 function renderFunnelAnalysis() {
@@ -759,18 +1242,20 @@ function renderNotesCompareTable() {
   const tbody = document.getElementById("notesCompareBody");
   if (!tbody) return;
   const rows = notesCompareRecords();
-  tbody.innerHTML = rows.map((record) => `
+  const pageRows = paginatedRows(rows, "notes");
+  tbody.innerHTML = pageRows.map((record) => `
     <tr>
       <td><div class="note-title">${escapeHtml(record.title)}</div></td>
       <td>${escapeHtml(record.publishedAtText)}</td>
       <td>${escapeHtml(record.type)}</td>
       <td>
         <div class="tags notes-tags">
-          ${record.labels.map((label) => `<span class="tag">${escapeHtml(label)}</span>`).join("")}
+          ${record.labels.map((label) => `<span class="tag ${tagClass(label)}">${escapeHtml(label)}</span>`).join("")}
         </div>
       </td>
       <td><div class="metric-main">${formatNumber(record.impressions)}</div></td>
       <td><div class="metric-main">${formatNumber(record.views)}</div></td>
+      <td><div class="metric-main">${formatOptionalPct(record.officialCoverClickRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.viewRate)}</div></td>
       <td><div class="metric-main">${record.avgWatchSeconds.toFixed(1)}s</div></td>
       <td><div class="metric-main">${formatNumber(record.likes)}</div></td>
@@ -778,12 +1263,15 @@ function renderNotesCompareTable() {
       <td><div class="metric-main">${formatNumber(record.collects)}</div></td>
       <td><div class="metric-main">${formatNumber(record.shares)}</div></td>
       <td><div class="metric-main">${formatNumber(record.followersGained)}</div></td>
+      <td><div class="metric-main">${formatNumber(record.cesScore)}</div></td>
       <td><div class="metric-main">${formatPct(record.interactionRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.followRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.collectRate)}</div></td>
       <td><div class="metric-main">${formatPct(record.spreadRate)}</div></td>
     </tr>
   `).join("");
+  renderPagination("notes", rows.length);
+  updateSortHeaders("notes");
 }
 
 function renderNotesCompare() {
@@ -798,8 +1286,8 @@ function csvEscape(value) {
 
 function exportNotesReport() {
   const headers = [
-    "标题", "发布时间", "类型", "标签", "曝光", "观看", "点击率", "平均观看时长",
-    "点赞", "评论", "收藏", "分享", "涨粉", "互动率", "转粉率", "收藏率", "传播率"
+    "标题", "发布时间", "类型", "标签", "曝光", "观看", "官方封面点击率", "观看曝光比", "平均观看时长",
+    "点赞", "评论", "收藏", "分享", "涨粉", "CES评分", "互动率", "转粉率", "收藏率", "传播率"
   ];
   const rows = notesCompareRecords().map((record) => [
     record.title,
@@ -808,6 +1296,7 @@ function exportNotesReport() {
     record.labels.join("|"),
     record.impressions,
     record.views,
+    formatOptionalPct(record.officialCoverClickRate),
     formatPct(record.viewRate),
     `${record.avgWatchSeconds.toFixed(1)}s`,
     record.likes,
@@ -815,6 +1304,7 @@ function exportNotesReport() {
     record.collects,
     record.shares,
     record.followersGained,
+    record.cesScore,
     formatPct(record.interactionRate),
     formatPct(record.followRate),
     formatPct(record.collectRate),
@@ -845,6 +1335,8 @@ function renderView() {
     setTimeout(() => state.publishChart && state.publishChart.resize(), 0);
   } else if (state.view === "funnel") {
     setTimeout(() => state.funnelChart && state.funnelChart.resize(), 0);
+  } else if (state.view === "cover") {
+    setTimeout(() => state.coverChart && state.coverChart.resize(), 0);
   } else {
     setTimeout(() => state.chart && state.chart.resize(), 0);
   }
@@ -857,6 +1349,7 @@ function render() {
   renderTable();
   renderPublishAnalysis();
   renderFunnelAnalysis();
+  renderCoverAnalysis();
   renderNotesCompare();
   renderView();
 }
@@ -885,32 +1378,55 @@ document.getElementById("chartMetricSelect").addEventListener("change", (event) 
 });
 document.getElementById("publishMetricSelect").addEventListener("change", (event) => {
   state.publishMetric = event.target.value;
+  tableState("publish").sortKey = {
+    impressions: "avgImpressions",
+    interactions: "avgInteractions",
+    followRate: "avgFollowRate"
+  }[state.publishMetric] || "avgImpressions";
+  tableState("publish").sortDir = "desc";
+  resetTablePage("publish");
   renderPublishAnalysis();
 });
 document.getElementById("funnelNoteSelect").addEventListener("change", (event) => {
   state.funnelNoteKey = event.target.value;
   renderFunnelAnalysis();
 });
+document.getElementById("coverSortSelect").addEventListener("change", (event) => {
+  state.coverSort = event.target.value;
+  tableState("cover").sortKey = state.coverSort;
+  tableState("cover").sortDir = "desc";
+  resetTablePage("cover");
+  renderCoverAnalysis();
+});
 document.getElementById("notesCompareSearch").addEventListener("input", (event) => {
   state.notesCompareSearch = event.target.value;
+  resetTablePage("notes");
   renderNotesCompareTable();
 });
 document.getElementById("notesCompareSort").addEventListener("change", (event) => {
   state.notesCompareSort = event.target.value;
+  tableState("notes").sortKey = state.notesCompareSort;
+  tableState("notes").sortDir = "desc";
+  resetTablePage("notes");
   renderNotesCompareTable();
 });
 document.getElementById("notesCompareTag").addEventListener("change", (event) => {
   state.notesCompareTag = event.target.value;
+  resetTablePage("notes");
   renderNotesCompareTable();
 });
 document.getElementById("exportNotesReportBtn").addEventListener("click", exportNotesReport);
 document.getElementById("searchInput").addEventListener("input", (event) => {
   state.search = event.target.value;
+  resetTablePage("lifecycle");
   renderTable();
   renderLifecycleChart();
 });
 document.getElementById("sortSelect").addEventListener("change", (event) => {
   state.sort = event.target.value;
+  tableState("lifecycle").sortKey = state.sort === "interactions" ? "m14" : state.sort;
+  tableState("lifecycle").sortDir = "desc";
+  resetTablePage("lifecycle");
   renderTable();
   renderLifecycleChart();
 });
@@ -919,8 +1435,34 @@ document.getElementById("filterTabs").addEventListener("click", (event) => {
   if (!button) return;
   state.filter = button.dataset.filter;
   document.querySelectorAll("#filterTabs button").forEach((item) => item.classList.toggle("active", item === button));
+  resetTablePage("lifecycle");
   renderTable();
   renderLifecycleChart();
+});
+
+document.addEventListener("click", (event) => {
+  const header = event.target.closest("th[data-table][data-sort-key]");
+  if (header) {
+    setTableSort(header.dataset.table, header.dataset.sortKey);
+    return;
+  }
+
+  const pageButton = event.target.closest("[data-page-action]");
+  if (!pageButton) return;
+  const config = tableState(pageButton.dataset.table);
+  if (!config) return;
+  config.page += pageButton.dataset.pageAction === "next" ? 1 : -1;
+  renderTableById(pageButton.dataset.table);
+});
+
+document.addEventListener("change", (event) => {
+  const pageSizeSelect = event.target.closest("[data-page-size]");
+  if (!pageSizeSelect) return;
+  const config = tableState(pageSizeSelect.dataset.table);
+  if (!config) return;
+  config.pageSize = Number(pageSizeSelect.value) || 10;
+  config.page = 1;
+  renderTableById(pageSizeSelect.dataset.table);
 });
 
 document.querySelectorAll(".menu-item").forEach((item) => {
