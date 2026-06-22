@@ -713,7 +713,7 @@ function renderCoverChart() {
 
   const rows = coverRecords().filter((row) => row.officialCoverClickRate != null).slice(0, 12).reverse();
   state.coverChart.setOption({
-    color: ["#c73535", "#2374d5"],
+    color: ["#7c5cff", "#4d9cff"],
     grid: { left: 132, right: 30, top: 34, bottom: 36 },
     tooltip: {
       trigger: "axis",
@@ -725,14 +725,14 @@ function renderCoverChart() {
     },
     xAxis: {
       type: "value",
-      axisLabel: { color: "#65717e", formatter: (value) => `${value}%` },
-      splitLine: { lineStyle: { color: "#edf1f4" } }
+      axisLabel: { color: "#7b8497", formatter: (value) => `${value}%` },
+      splitLine: { lineStyle: { color: "#edf0f7", type: "dashed" } }
     },
     yAxis: {
       type: "category",
       data: rows.map((row) => shortTitle(row.title)),
-      axisLabel: { color: "#4c5a66", width: 118, overflow: "truncate" },
-      axisLine: { lineStyle: { color: "#dbe2e8" } }
+      axisLabel: { color: "#566074", width: 118, overflow: "truncate" },
+      axisLine: { lineStyle: { color: "#e4e8f1" } }
     },
     series: [{
       name: "官方封面点击率",
@@ -841,7 +841,7 @@ function renderLifecycleChart() {
   }));
 
   state.chart.setOption({
-    color: ["#2f6fa9", "#c43d3d", "#87a84b", "#7358a6"],
+    color: ["#6c5ce7", "#4d9cff", "#2fc38c", "#ffb347"],
     grid: { left: 54, right: 24, top: 42, bottom: 70 },
     tooltip: {
       trigger: "axis",
@@ -863,22 +863,22 @@ function renderLifecycleChart() {
       icon: "roundRect",
       itemWidth: 22,
       itemHeight: 4,
-      textStyle: { color: "#4c5a66", fontSize: 12 }
+      textStyle: { color: "#566074", fontSize: 12 }
     },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: MILESTONE_LABELS,
-      axisLine: { lineStyle: { color: "#dbe2e8" } },
-      axisLabel: { color: "#65717e" }
+      axisLine: { lineStyle: { color: "#e4e8f1" } },
+      axisLabel: { color: "#7b8497" }
     },
     yAxis: {
       type: "value",
       axisLabel: {
-        color: "#65717e",
+        color: "#7b8497",
         formatter: (value) => metric.endsWith("Rate") ? `${value * 100}%` : formatNumber(value)
       },
-      splitLine: { lineStyle: { color: "#edf1f4" } }
+      splitLine: { lineStyle: { color: "#edf0f7", type: "dashed" } }
     },
     series
   }, true);
@@ -1011,7 +1011,7 @@ function renderPublishHeatmap() {
   const maxValue = Math.max(1, ...values.map((item) => Number(item[2] || 0)));
 
   state.publishChart.setOption({
-    color: ["#2374d5"],
+    color: ["#735cff"],
     grid: { left: 64, right: 28, top: 30, bottom: 112 },
     tooltip: {
       formatter: (params) => {
@@ -1040,7 +1040,7 @@ function renderPublishHeatmap() {
       orient: "horizontal",
       left: "center",
       bottom: 24,
-      inRange: { color: ["#eef4f8", "#8fc3a6", "#f2c45b", "#c73535"] },
+      inRange: { color: ["#f4f2ff", "#d9d1ff", "#a997ff", "#6c5ce7"] },
       formatter: (value) => metric.endsWith("Rate") ? formatPct(value) : formatNumber(value)
     },
     series: [{

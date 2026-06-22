@@ -3,76 +3,106 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>小红书数据分析中心</title>
+    <title>小红书数据助手</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%229%22 fill=%22%236c5ce7%22/><rect x=%2210%22 y=%2210%22 width=%2212%22 height=%2212%22 rx=%224%22 fill=%22white%22/></svg>" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="workspace">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">小</div>
-          <div>
-            <div class="brand-name">数据分析中心</div>
-            <div class="brand-sub">小红书创作者</div>
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
           </div>
+          <div class="brand-copy">
+            <div class="brand-name">小红书数据助手</div>
+            <div class="brand-sub">Creator Analytics</div>
+          </div>
+          <span class="pro-badge">Pro</span>
         </div>
 
         <nav class="menu">
           <div class="menu-group">
-            <div class="menu-label">分析</div>
+            <div class="menu-label">数据分析</div>
             <button class="menu-item active" type="button" data-view="lifecycle">
-              <span class="menu-icon">↗</span>
+              <span class="menu-icon">▥</span>
               生命周期对比
             </button>
             <button class="menu-item" type="button" data-view="publish">
-              <span class="menu-icon">#</span>
+              <span class="menu-icon">◷</span>
               发布时间分析
             </button>
             <button class="menu-item" type="button" data-view="funnel">
-              <span class="menu-icon">▽</span>
+              <span class="menu-icon">◇</span>
               内容诊断
             </button>
             <button class="menu-item" type="button" data-view="cover">
-              <span class="menu-icon">▣</span>
+              <span class="menu-icon">▧</span>
               封面分析
             </button>
             <button class="menu-item" type="button" data-view="notes">
-              <span class="menu-icon">≡</span>
+              <span class="menu-icon">☷</span>
               数据总览
             </button>
           </div>
 
-          <div class="menu-group">
-
+          <div class="sidebar-tip">
+            <span class="sidebar-tip-icon">✦</span>
+            <div>
+              <strong>让数据指导创作</strong>
+              <p>持续导入数据，获得更准确的内容洞察。</p>
+            </div>
           </div>
         </nav>
       </aside>
 
       <main class="main">
         <header class="main-top">
-          <div>
-            <div class="breadcrumb">数据看板 / 生命周期对比</div>
-            <h1>笔记生命周期对比</h1>
+          <div class="page-heading">
+            <div class="heading-row">
+              <h1>笔记生命周期对比</h1>
+              <span class="page-kicker">数据看板</span>
+            </div>
+            <div class="breadcrumb">全面了解笔记从发布到长尾的表现变化</div>
           </div>
-          <button id="refreshBtn" class="button primary" type="button">重新导入</button>
+          <div class="top-actions">
+            <span class="data-status"><i></i> 本地数据已连接</span>
+            <button id="refreshBtn" class="button primary" type="button">导入新数据</button>
+          </div>
         </header>
 
         <section class="content-card compact-summary">
-          <div class="summary-item">
-            <span>导入笔记</span>
-            <strong id="noteCount">-</strong>
+          <div class="summary-item summary-purple">
+            <span class="summary-icon">▤</span>
+            <div>
+              <span>导入笔记</span>
+              <strong id="noteCount">-</strong>
+              <small>当前分析样本</small>
+            </div>
           </div>
-          <div class="summary-item">
-            <span>总曝光</span>
-            <strong id="totalImpressions">-</strong>
+          <div class="summary-item summary-blue">
+            <span class="summary-icon">◉</span>
+            <div>
+              <span>总曝光量</span>
+              <strong id="totalImpressions">-</strong>
+              <small>内容触达规模</small>
+            </div>
           </div>
-          <div class="summary-item">
-            <span>总观看</span>
-            <strong id="totalViews">-</strong>
+          <div class="summary-item summary-green">
+            <span class="summary-icon">▶</span>
+            <div>
+              <span>总观看量</span>
+              <strong id="totalViews">-</strong>
+              <small>有效内容消费</small>
+            </div>
           </div>
-          <div class="summary-item">
-            <span>总互动</span>
-            <strong id="totalInteractions">-</strong>
+          <div class="summary-item summary-pink">
+            <span class="summary-icon">♥</span>
+            <div>
+              <span>总互动量</span>
+              <strong id="totalInteractions">-</strong>
+              <small>点赞收藏评论</small>
+            </div>
           </div>
           <div class="summary-meta" id="syncMeta">正在读取本地导出数据...</div>
         </section>
