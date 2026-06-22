@@ -838,12 +838,142 @@ select {
   min-width: 1980px;
 }
 
-.note-review-card {
-  margin: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fbfbfe;
+.modal-open {
   overflow: hidden;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 24, 40, 0.48);
+  padding: 24px;
+  backdrop-filter: blur(5px);
+  animation: modal-fade-in 160ms ease-out;
+}
+
+.note-review-card {
+  display: flex;
+  flex-direction: column;
+  width: min(1180px, 100%);
+  max-height: min(920px, calc(100vh - 40px));
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(24, 27, 46, 0.24);
+  overflow: hidden;
+  animation: modal-rise-in 190ms ease-out;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.8px;
+}
+
+.review-title-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #f0edff, #f7f5ff);
+  color: var(--accent);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.modal-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: #f4f5f8;
+  color: #697184;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.modal-close:hover {
+  background: #eceafc;
+  color: var(--accent);
+}
+
+.note-review-selector {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfbfe;
+}
+
+.note-review-selector label {
+  flex: 0 0 auto;
+  color: #596276;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.note-review-selector .select-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-review-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: #d8dbe6 transparent;
+  scrollbar-width: thin;
+}
+
+.note-review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 68px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+  padding: 14px 28px;
+}
+
+.note-review-footer-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.note-review-footer-actions .button {
+  min-width: 88px;
 }
 
 .note-review-head {
@@ -851,13 +981,13 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  padding: 16px;
+  padding: 28px 28px 22px;
   border-bottom: 1px solid var(--line);
 }
 
 .note-review-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 22px;
 }
 
 .note-review-head p,
@@ -867,7 +997,7 @@ select {
 }
 
 .note-review-head p {
-  margin: 5px 0 0;
+  margin: 7px 0 0;
 }
 
 .note-review-actions {
@@ -876,59 +1006,169 @@ select {
 }
 
 .note-review-progress {
-  padding: 10px 16px;
+  padding: 10px 28px;
   border-bottom: 1px solid var(--line);
   background: #f5f4ff;
 }
 
 .note-review-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: block;
 }
 
-.review-field-group {
-  min-width: 0;
-  padding: 14px 16px;
-  border-right: 1px solid var(--line);
+.review-form-section {
+  padding: 22px 28px 26px;
   border-bottom: 1px solid var(--line);
 }
 
-.review-field-group:nth-child(2n) {
-  border-right: 0;
+.review-form-section > h4 {
+  position: relative;
+  margin: 0 0 18px;
+  padding-left: 14px;
+  color: #23283a;
+  font-size: 15px;
+  font-weight: 750;
 }
 
-.review-field-group h4 {
-  margin: 0 0 10px;
-  font-size: 12px;
+.review-form-section > h4::before {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(#7962ff, #5e4be4);
+  content: "";
 }
 
-.review-option-list {
+.review-dropdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 28px;
+}
+
+.review-dropdown-field {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.review-dropdown-field > label {
+  color: #394155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-dropdown-trigger {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: #fff;
+  color: #303749;
+  padding: 0 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.review-option {
-  border: 1px solid var(--line);
-  border-radius: 999px;
+.review-dropdown-trigger:hover,
+.review-dropdown-trigger[aria-expanded="true"] {
+  border-color: #a99df5;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.08);
+}
+
+.review-dropdown-trigger span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.review-dropdown-trigger .placeholder {
+  color: #9aa2b1;
+}
+
+.review-dropdown-trigger i {
+  color: #8490a4;
+  font-size: 18px;
+  font-style: normal;
+  transition: transform 150ms ease;
+}
+
+.review-dropdown-trigger[aria-expanded="true"] i {
+  transform: rotate(180deg);
+}
+
+.review-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 30;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
   background: #fff;
-  color: #596276;
-  padding: 6px 10px;
+  padding: 7px;
+  box-shadow: 0 14px 35px rgba(35, 39, 65, 0.15);
+}
+
+.review-dropdown-options {
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.review-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #4b5467;
+  padding: 7px 9px;
+  text-align: left;
   cursor: pointer;
+}
+
+.review-dropdown-option:hover {
+  background: #f7f6ff;
+}
+
+.review-dropdown-option.selected {
+  background: #f0edff;
+  color: #5f4ad9;
+  font-weight: 650;
+}
+
+.review-option-check {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  border: 1px solid #d8dce7;
+  border-radius: 5px;
+  color: #fff;
   font-size: 11px;
 }
 
-.review-option.selected {
-  border-color: #b8adff;
-  background: #efedff;
-  color: #5d49da;
-  font-weight: 700;
+.review-dropdown-option.selected .review-option-check {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .review-custom-row {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 7px;
+  border-top: 1px solid #eff1f5;
+  padding-top: 8px;
 }
 
 .review-custom-input,
@@ -943,11 +1183,16 @@ select {
   height: 34px;
 }
 
+.review-custom-row .button {
+  min-height: 34px;
+  padding: 5px 11px;
+}
+
 .note-review-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  padding: 16px;
+  padding: 0;
 }
 
 .note-review-details label {
@@ -971,7 +1216,7 @@ select {
   align-items: center;
   flex-wrap: wrap;
   gap: 18px;
-  padding: 0 16px 16px;
+  padding: 16px 0 0;
   color: #596276;
   font-size: 12px;
 }
@@ -983,8 +1228,8 @@ select {
 }
 
 .note-review-status {
-  margin-left: auto;
   color: var(--muted);
+  font-size: 12px;
 }
 
 .review-edit-button {
@@ -1178,14 +1423,21 @@ select {
     padding: 12px;
   }
 
-  .note-review-card {
-    margin: 12px;
+  .modal-backdrop {
+    align-items: end;
+    padding: 12px;
   }
 
-  .note-review-head,
-  .note-review-actions {
-    flex-direction: column;
+  .note-review-card {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 16px;
+  }
+
+  .note-review-selector {
     align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
   }
 
   .note-review-fields,
@@ -1199,6 +1451,17 @@ select {
 
   .review-wide-field {
     grid-column: auto;
+  }
+
+  .note-review-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .note-review-footer-actions,
+  .note-review-footer-actions .button {
+    width: 100%;
   }
 
   .search-input,

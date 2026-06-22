@@ -222,48 +222,64 @@
             </div>
           </div>
 
-          <section class="note-review-card">
-            <div class="note-review-head">
-              <div>
-                <h3>笔记复盘标签卡</h3>
-                <p>补充内容事实，数据会保存在本机，重新导入 Excel 不会覆盖。</p>
+          <div id="noteReviewModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="noteReviewModalTitle">
+            <section class="note-review-card">
+              <div class="note-review-head">
+                <div class="review-title-icon" aria-hidden="true">◇</div>
+                <div>
+                  <span class="modal-eyebrow">笔记复盘</span>
+                  <h3 id="noteReviewModalTitle">补充笔记标签</h3>
+                  <p>补充内容事实，数据会保存在本机，重新导入 Excel 不会覆盖。</p>
+                </div>
+                <button class="modal-close" type="button" data-close-review-modal aria-label="关闭弹窗">×</button>
               </div>
-              <div class="note-review-actions">
+              <div class="note-review-selector">
+                <label for="reviewNoteSelect">当前笔记</label>
                 <select id="reviewNoteSelect" class="select-input wide-select"></select>
-                <button id="saveNoteReviewBtn" class="button primary" type="button">保存复盘</button>
               </div>
-            </div>
-            <div id="noteReviewProgress" class="note-review-progress"></div>
-            <div id="noteReviewFields" class="note-review-fields"></div>
-            <div class="note-review-details">
-              <label>
-                <span>视频时长（秒）</span>
-                <input id="reviewVideoDuration" class="review-text-input" type="number" min="0" max="86400" />
-              </label>
-              <label>
-                <span>系列名称</span>
-                <input id="reviewSeriesName" class="review-text-input" type="text" maxlength="80" placeholder="例如：AI 小白课" />
-              </label>
-              <label class="review-wide-field">
-                <span>前 5 秒补充说明</span>
-                <input id="reviewFirstFiveSecondsNote" class="review-text-input" type="text" maxlength="300" placeholder="具体台词、画面或承诺" />
-              </label>
-              <label class="review-wide-field">
-                <span>结尾引导</span>
-                <input id="reviewEndingCtaNote" class="review-text-input" type="text" maxlength="200" placeholder="例如：关注后看下一集 / 评论区领取资料" />
-              </label>
-              <label class="review-wide-field">
-                <span>复盘备注</span>
-                <textarea id="reviewNotes" class="review-textarea" maxlength="500" placeholder="记录选题背景、制作变化或其他影响因素"></textarea>
-              </label>
-            </div>
-            <div class="review-flags">
-              <label><input id="reviewTrendTracking" type="checkbox" /> 热点追踪</label>
-              <label><input id="reviewPersonOnCamera" type="checkbox" /> 真人出镜</label>
-              <label><input id="reviewFollowCta" type="checkbox" /> 有明确关注引导</label>
-              <span id="noteReviewStatus" class="note-review-status"></span>
-            </div>
-          </section>
+              <div id="noteReviewProgress" class="note-review-progress"></div>
+              <div class="note-review-scroll">
+                <div id="noteReviewFields" class="note-review-fields"></div>
+                <section class="review-form-section">
+                  <h4>其他信息</h4>
+                  <div class="note-review-details">
+                  <label>
+                    <span>视频时长（秒）</span>
+                    <input id="reviewVideoDuration" class="review-text-input" type="number" min="0" max="86400" />
+                  </label>
+                  <label>
+                    <span>系列名称</span>
+                    <input id="reviewSeriesName" class="review-text-input" type="text" maxlength="80" placeholder="例如：AI 小白课" />
+                  </label>
+                  <label class="review-wide-field">
+                    <span>前 5 秒补充说明</span>
+                    <input id="reviewFirstFiveSecondsNote" class="review-text-input" type="text" maxlength="300" placeholder="具体台词、画面或承诺" />
+                  </label>
+                  <label class="review-wide-field">
+                    <span>结尾引导</span>
+                    <input id="reviewEndingCtaNote" class="review-text-input" type="text" maxlength="200" placeholder="例如：关注后看下一集 / 评论区领取资料" />
+                  </label>
+                  <label class="review-wide-field">
+                    <span>复盘备注</span>
+                    <textarea id="reviewNotes" class="review-textarea" maxlength="500" placeholder="记录选题背景、制作变化或其他影响因素"></textarea>
+                  </label>
+                  </div>
+                  <div class="review-flags">
+                    <label><input id="reviewTrendTracking" type="checkbox" /> 热点追踪</label>
+                    <label><input id="reviewPersonOnCamera" type="checkbox" /> 真人出镜</label>
+                    <label><input id="reviewFollowCta" type="checkbox" /> 有明确关注引导</label>
+                  </div>
+                </section>
+              </div>
+              <div class="note-review-footer">
+                <span id="noteReviewStatus" class="note-review-status"></span>
+                <div class="note-review-footer-actions">
+                  <button class="button" type="button" data-close-review-modal>取消</button>
+                  <button id="saveNoteReviewBtn" class="button primary" type="button">保存复盘</button>
+                </div>
+              </div>
+            </section>
+          </div>
 
           <div class="table-wrap notes-compare-wrap">
             <table class="data-table notes-compare-table">

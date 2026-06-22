@@ -55,6 +55,20 @@ const REVIEW_FIELD_META = {
   targetActions: "目标动作",
   audiences: "目标人群"
 };
+const REVIEW_FIELD_GROUPS = [
+  {
+    title: "内容特征",
+    fields: ["contentTypes", "formats"]
+  },
+  {
+    title: "核心亮点",
+    fields: ["hooks", "coverStyles", "firstFiveSecondStructures"]
+  },
+  {
+    title: "目标与受众",
+    fields: ["targetActions", "audiences"]
+  }
+];
 
 const VIEW_META = {
   lifecycle: ["数据看板 / 生命周期对比", "笔记生命周期对比"],
@@ -1375,29 +1389,47 @@ function reviewOptions(field) {
 function renderReviewFields() {
   const container = document.getElementById("noteReviewFields");
   if (!container || !state.reviewDraft) return;
-  container.innerHTML = Object.entries(REVIEW_FIELD_META).map(([field, label]) => {
-    const selected = new Set(state.reviewDraft[field] || []);
-    return `
-      <section class="review-field-group">
-        <h4>${escapeHtml(label)}</h4>
-        <div class="review-option-list">
-          ${reviewOptions(field).map((option) => `
-            <button
-              class="review-option ${selected.has(option) ? "selected" : ""}"
-              type="button"
-              data-review-field="${field}"
-              data-review-value="${encodeURIComponent(option)}"
-              aria-pressed="${selected.has(option)}"
-            >${escapeHtml(option)}</button>
-          `).join("")}
-        </div>
-        <div class="review-custom-row">
-          <input class="review-custom-input" data-review-custom-input="${field}" type="text" maxlength="40" placeholder="新增自定义选项" />
-          <button class="button" type="button" data-review-add="${field}">添加</button>
-        </div>
-      </section>
-    `;
-  }).join("");
+  container.innerHTML = REVIEW_FIELD_GROUPS.map((group) => `
+    <section class="review-form-section">
+      <h4>${escapeHtml(group.title)}</h4>
+      <div class="review-dropdown-grid">
+        ${group.fields.map((field) => {
+          const label = REVIEW_FIELD_META[field];
+          const selected = new Set(state.reviewDraft[field] || []);
+          const selectedText = [...selected].join("、");
+          return `
+            <div class="review-dropdown-field" data-review-dropdown="${field}">
+              <label>${escapeHtml(label)}</label>
+              <button class="review-dropdown-trigger" type="button" data-review-dropdown-toggle="${field}" aria-expanded="false">
+                <span class="${selectedText ? "" : "placeholder"}">${escapeHtml(selectedText || `请选择${label}`)}</span>
+                <i>⌄</i>
+              </button>
+              <div class="review-dropdown-menu hidden">
+                <div class="review-dropdown-options">
+                  ${reviewOptions(field).map((option) => `
+                    <button
+                      class="review-dropdown-option ${selected.has(option) ? "selected" : ""}"
+                      type="button"
+                      data-review-field="${field}"
+                      data-review-value="${encodeURIComponent(option)}"
+                      aria-pressed="${selected.has(option)}"
+                    >
+                      <span class="review-option-check">${selected.has(option) ? "✓" : ""}</span>
+                      <span>${escapeHtml(option)}</span>
+                    </button>
+                  `).join("")}
+                </div>
+                <div class="review-custom-row">
+                  <input class="review-custom-input" data-review-custom-input="${field}" type="text" maxlength="40" placeholder="输入自定义选项" />
+                  <button class="button" type="button" data-review-add="${field}">添加</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function renderNoteReviewCard() {
@@ -1429,6 +1461,22 @@ function renderNoteReviewCard() {
     `已复盘 ${reviewed}/${state.data.notes.length} 篇${note?.review?.updatedAt ? `；当前笔记上次保存于 ${new Date(note.review.updatedAt).toLocaleString("zh-CN")}` : "；当前笔记尚未标注"}`;
 }
 
+function openNoteReviewModal(noteKey) {
+  state.reviewNoteKey = noteKey;
+  resetReviewDraft();
+  renderNoteReviewCard();
+  const modal = document.getElementById("noteReviewModal");
+  modal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  document.getElementById("noteReviewStatus").textContent = "";
+  requestAnimationFrame(() => document.querySelector("[data-close-review-modal]")?.focus());
+}
+
+function closeNoteReviewModal() {
+  document.getElementById("noteReviewModal").classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
 async function saveNoteReview() {
   const note = selectedReviewNote();
   if (!note) return;
@@ -1458,7 +1506,7 @@ async function saveNoteReview() {
     renderNoteReviewCard();
     renderNotesCompareFilters();
     renderNotesCompareTable();
-    status.textContent = "已保存到本机";
+    closeNoteReviewModal();
   } catch (error) {
     status.textContent = `保存失败：${error.message}`;
   } finally {
@@ -1682,7 +1730,26 @@ document.getElementById("reviewNoteSelect").addEventListener("change", (event) =
   renderNoteReviewCard();
 });
 document.getElementById("saveNoteReviewBtn").addEventListener("click", saveNoteReview);
+document.getElementById("noteReviewModal").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget || event.target.closest("[data-close-review-modal]")) {
+    closeNoteReviewModal();
+  }
+});
 document.getElementById("noteReviewFields").addEventListener("click", (event) => {
+  const dropdownToggle = event.target.closest("[data-review-dropdown-toggle]");
+  if (dropdownToggle) {
+    const field = dropdownToggle.dataset.reviewDropdownToggle;
+    const wrapper = dropdownToggle.closest("[data-review-dropdown]");
+    const menu = wrapper.querySelector(".review-dropdown-menu");
+    const willOpen = menu.classList.contains("hidden");
+    document.querySelectorAll(".review-dropdown-menu").forEach((item) => item.classList.add("hidden"));
+    document.querySelectorAll("[data-review-dropdown-toggle]").forEach((item) => item.setAttribute("aria-expanded", "false"));
+    menu.classList.toggle("hidden", !willOpen);
+    dropdownToggle.setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) menu.querySelector(".review-dropdown-option, .review-custom-input")?.focus();
+    return;
+  }
+
   const option = event.target.closest("[data-review-field][data-review-value]");
   if (option) {
     syncReviewDraftFromForm();
@@ -1693,6 +1760,9 @@ document.getElementById("noteReviewFields").addEventListener("click", (event) =>
     else selected.add(value);
     state.reviewDraft[field] = [...selected];
     renderReviewFields();
+    const menu = document.querySelector(`[data-review-dropdown="${field}"] .review-dropdown-menu`);
+    menu?.classList.remove("hidden");
+    document.querySelector(`[data-review-dropdown-toggle="${field}"]`)?.setAttribute("aria-expanded", "true");
     return;
   }
 
@@ -1708,6 +1778,15 @@ document.getElementById("noteReviewFields").addEventListener("click", (event) =>
     ...new Set([...(state.data.reviewMetadata.options[field] || []), value])
   ];
   renderReviewFields();
+  const menu = document.querySelector(`[data-review-dropdown="${field}"] .review-dropdown-menu`);
+  menu?.classList.remove("hidden");
+  document.querySelector(`[data-review-dropdown-toggle="${field}"]`)?.setAttribute("aria-expanded", "true");
+});
+document.getElementById("noteReviewFields").addEventListener("keydown", (event) => {
+  const input = event.target.closest("[data-review-custom-input]");
+  if (!input || event.key !== "Enter") return;
+  event.preventDefault();
+  input.closest(".review-custom-row")?.querySelector("[data-review-add]")?.click();
 });
 document.getElementById("exportNotesReportBtn").addEventListener("click", exportNotesReport);
 document.getElementById("searchInput").addEventListener("input", (event) => {
@@ -1735,12 +1814,14 @@ document.getElementById("filterTabs").addEventListener("click", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-review-dropdown]")) {
+    document.querySelectorAll(".review-dropdown-menu").forEach((item) => item.classList.add("hidden"));
+    document.querySelectorAll("[data-review-dropdown-toggle]").forEach((item) => item.setAttribute("aria-expanded", "false"));
+  }
+
   const reviewButton = event.target.closest("[data-review-note]");
   if (reviewButton) {
-    state.reviewNoteKey = reviewButton.dataset.reviewNote;
-    resetReviewDraft();
-    renderNoteReviewCard();
-    document.querySelector(".note-review-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    openNoteReviewModal(reviewButton.dataset.reviewNote);
     return;
   }
 
@@ -1756,6 +1837,12 @@ document.addEventListener("click", (event) => {
   if (!config) return;
   config.page += pageButton.dataset.pageAction === "next" ? 1 : -1;
   renderTableById(pageButton.dataset.table);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !document.getElementById("noteReviewModal").classList.contains("hidden")) {
+    closeNoteReviewModal();
+  }
 });
 
 document.addEventListener("change", (event) => {
