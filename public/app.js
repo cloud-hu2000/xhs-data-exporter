@@ -629,6 +629,47 @@ function notesCompareRecords() {
   });
 }
 
+function medianOf(rows, key, { optional = false } = {}) {
+  const values = rows
+    .map((row) => row[key])
+    .filter((value) => value != null && Number.isFinite(Number(value)))
+    .map(Number)
+    .sort((a, b) => a - b);
+  if (values.length === 0) return optional ? null : 0;
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 === 0
+    ? (values[middle - 1] + values[middle]) / 2
+    : values[middle];
+}
+
+function notesMedianRow(rows) {
+  const value = (key, options) => medianOf(rows, key, options);
+  return `
+    <tr class="median-row">
+      <td><div class="note-title">中位数</div></td>
+      <td>当前筛选</td>
+      <td>-</td>
+      <td><span class="median-sample">${formatNumber(rows.length)} 篇</span></td>
+      <td><div class="metric-main">${formatNumber(value("impressions"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("views"))}</div></td>
+      <td><div class="metric-main">${formatOptionalPct(value("officialCoverClickRate", { optional: true }))}</div></td>
+      <td><div class="metric-main">${formatPct(value("viewRate"))}</div></td>
+      <td><div class="metric-main">${value("avgWatchSeconds").toFixed(1)}s</div></td>
+      <td><div class="metric-main">${formatNumber(value("likes"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("comments"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("collects"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("shares"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("followersGained"))}</div></td>
+      <td><div class="metric-main">${formatNumber(value("cesScore"))}</div></td>
+      <td><div class="metric-main">${formatPct(value("interactionRate"))}</div></td>
+      <td><div class="metric-main">${formatPct(value("followRate"))}</div></td>
+      <td><div class="metric-main">${formatPct(value("collectRate"))}</div></td>
+      <td><div class="metric-main">${formatPct(value("spreadRate"))}</div></td>
+      <td>-</td>
+    </tr>
+  `;
+}
+
 function allCompareTags() {
   return [...new Set(state.data.notes.flatMap((note) => noteCompareRecord(note).labels))].filter(Boolean).sort();
 }
@@ -1533,7 +1574,7 @@ function renderNotesCompareTable() {
   if (!tbody) return;
   const rows = notesCompareRecords();
   const pageRows = paginatedRows(rows, "notes");
-  tbody.innerHTML = pageRows.map((record) => `
+  tbody.innerHTML = notesMedianRow(rows) + pageRows.map((record) => `
     <tr>
       <td><div class="note-title">${escapeHtml(record.title)}</div></td>
       <td>${escapeHtml(record.publishedAtText)}</td>
