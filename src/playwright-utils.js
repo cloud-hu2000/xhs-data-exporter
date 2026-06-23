@@ -82,8 +82,12 @@ function snapshotFiles(dir) {
   if (!fs.existsSync(dir)) return snapshot;
   for (const name of fs.readdirSync(dir)) {
     const file = path.join(dir, name);
-    const stat = fs.statSync(file);
-    snapshot.set(file, `${stat.size}:${stat.mtimeMs}`);
+    try {
+      const stat = fs.statSync(file);
+      snapshot.set(file, `${stat.size}:${stat.mtimeMs}`);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   return snapshot;
 }
@@ -94,13 +98,31 @@ function newFilesSince(dir, before) {
     .readdirSync(dir)
     .map((name) => path.join(dir, name))
     .filter((file) => {
-      const stat = fs.statSync(file);
-      return before.get(file) !== `${stat.size}:${stat.mtimeMs}`;
+      try {
+        const stat = fs.statSync(file);
+        return before.get(file) !== `${stat.size}:${stat.mtimeMs}`;
+      } catch (error) {
+        if (error.code === "ENOENT") return false;
+        throw error;
+      }
     });
 }
 
 function safeFilename(name) {
-  return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").slice(0, 160);
+  const sanitized = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+  const maxLength = 160;
+  if (sanitized.length <= maxLength) return sanitized;
+
+  const ext = path.extname(sanitized);
+  const stem = path.basename(sanitized, ext);
+  const reportSuffix = "-数据明细表";
+  const preservedSuffix = stem.endsWith(reportSuffix)
+    ? `${reportSuffix}${ext}`
+    : ext;
+  const trimmableStem = stem.endsWith(reportSuffix)
+    ? stem.slice(0, -reportSuffix.length)
+    : stem;
+  return `${trimmableStem.slice(0, Math.max(1, maxLength - preservedSuffix.length))}${preservedSuffix}`;
 }
 
 module.exports = {

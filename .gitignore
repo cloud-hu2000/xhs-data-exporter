@@ -2,6 +2,7 @@ node_modules/
 .chrome-profile/
 .chrome-profile-*/
 downloads/
+profile-exports/
 data/
 *.log
 .env

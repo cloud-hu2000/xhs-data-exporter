@@ -401,7 +401,15 @@ async function exportNoteByIndex(listPage, config, detailText, index, noteNumber
 }
 
 async function goNextPage(page, config) {
-  const next = await firstVisibleByTexts(page, config.nextPageTexts);
+  let next = await firstVisibleByTexts(page, config.nextPageTexts);
+  if (!next) {
+    const iconNext = page.locator(
+      ".d-pagination .d-pagination-page:has(svg path[d^='M19 12'])"
+    ).last();
+    if (await iconNext.isVisible().catch(() => false)) {
+      next = { text: "下一页图标", locator: iconNext };
+    }
+  }
   if (!next) return false;
 
   const disabled = await next.locator.evaluate((el) => {
@@ -413,9 +421,26 @@ async function goNextPage(page, config) {
 
   if (disabled) return false;
 
+  const activePageBefore = await page
+    .locator(".d-pagination-page[class*='primary'] .d-pagination-page-content")
+    .first()
+    .textContent()
+    .catch(() => "");
   console.log(`进入下一页: 点击“${next.text}”`);
   await next.locator.click();
   await page.waitForLoadState("domcontentloaded").catch(() => {});
+  if (activePageBefore) {
+    await page.waitForFunction(
+      (previous) => {
+        const active = document.querySelector(
+          ".d-pagination-page[class*='primary'] .d-pagination-page-content"
+        );
+        return active && active.textContent.trim() !== previous.trim();
+      },
+      activePageBefore,
+      { timeout: config.pageReadyTimeoutMs }
+    ).catch(() => {});
+  }
   await sleep(config.slowMoMs * 2);
   return true;
 }
