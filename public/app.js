@@ -11,6 +11,9 @@ const state = {
   notesCompareSearch: "",
   notesCompareSort: "cesScore",
   notesCompareTag: "all",
+  strategyNoteKey: "",
+  strategyPayload: null,
+  coverAiNoteKey: "",
   reviewNoteKey: "",
   reviewDraft: null,
   benchmarkCache: new Map(),
@@ -75,7 +78,8 @@ const VIEW_META = {
   publish: ["数据看板 / 发布时间分析", "发布时间分析"],
   funnel: ["数据看板 / 内容诊断", "分叉式内容诊断"],
   cover: ["数据看板 / 封面分析", "封面分析"],
-  notes: ["数据看板 / 笔记横向对比", "笔记横向对比"]
+  notes: ["数据看板 / 笔记横向对比", "笔记横向对比"],
+  strategy: ["数据看板 / 下一条做什么", "下一条做什么内容"]
 };
 
 function formatNumber(value) {
@@ -847,16 +851,250 @@ function renderCoverTable() {
           ${record.diagnostics.map((item) => `<span class="tag ${tagClass(item)}">${escapeHtml(item)}</span>`).join("")}
         </div>
       </td>
+      <td>
+        <button class="button ai-table-button" type="button" data-cover-ai="${escapeHtml(record.note.noteKey)}">
+          ${state.data.aiAnalysis?.[record.note.noteKey]?.coverAnalysis ? "查看解读" : "AI 解读"}
+        </button>
+      </td>
     </tr>
   `).join("");
   renderPagination("cover", rows.length);
   updateSortHeaders("cover");
 }
 
+function analysisList(items) {
+  if (!Array.isArray(items) || items.length === 0) return '<span class="analysis-muted">暂无</span>';
+  return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+function coverAnalysisHtml(analysis, note) {
+  if (!analysis) return '<div class="empty-analysis">尚未分析封面。</div>';
+  return `
+    <div class="cover-analysis-grid">
+      ${note?.coverImageUrl ? `<img class="analysis-cover-image" src="${escapeHtml(note.coverImageUrl)}" alt="${escapeHtml(note.title || "")}" referrerpolicy="no-referrer" />` : ""}
+      <div class="cover-analysis-copy">
+        <h4>${escapeHtml(analysis.summary || "封面解读")}</h4>
+        <dl class="analysis-definition-list">
+          <div><dt>视觉元素</dt><dd>${analysisList(analysis.visualElements)}</dd></div>
+          <div><dt>封面承诺</dt><dd>${escapeHtml(analysis.textAndPromise || "-")}</dd></div>
+          <div><dt>优势</dt><dd>${analysisList(analysis.strengths)}</dd></div>
+          <div><dt>风险</dt><dd>${analysisList(analysis.risks)}</dd></div>
+          <div><dt>解释假设</dt><dd>${analysisList(analysis.hypotheses)}</dd></div>
+          <div><dt>可验证实验</dt><dd>${analysisList(analysis.suggestedTests)}</dd></div>
+        </dl>
+        <div class="analysis-meta">${escapeHtml(analysis.model || "")}${analysis.analyzedAt ? ` · ${new Date(analysis.analyzedAt).toLocaleString("zh-CN")}` : ""}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCoverAiPanel(noteKey = state.coverAiNoteKey) {
+  const panel = document.getElementById("coverAiPanel");
+  if (!panel) return;
+  const note = state.data.notes.find((item) => item.noteKey === noteKey);
+  const analysis = state.data.aiAnalysis?.[noteKey]?.coverAnalysis;
+  if (!noteKey) {
+    panel.innerHTML = '<div class="empty-analysis">选择一篇笔记并点击“AI 解读”，封面分析结果会保存在本地并展示在这里。</div>';
+    return;
+  }
+  panel.innerHTML = `
+    <div class="strategy-section-head">
+      <div>
+        <h3>${escapeHtml(note?.title || "封面分析")}</h3>
+        <p>${analysis ? "本地已保存的 AI 封面解读" : "这篇笔记还没有生成 AI 封面解读"}</p>
+      </div>
+      <button class="button ${analysis ? "" : "primary"}" type="button" data-run-cover-ai="${escapeHtml(noteKey)}">${analysis ? "重新分析" : "开始分析"}</button>
+    </div>
+    ${coverAnalysisHtml(analysis, note)}
+  `;
+}
+
 function renderCoverAnalysis() {
   renderCoverChart();
   renderCoverInsights();
+  renderCoverAiPanel();
   renderCoverTable();
+}
+
+function selectedStrategyNote() {
+  if (!state.strategyNoteKey || !state.data.notes.some((note) => note.noteKey === state.strategyNoteKey)) {
+    state.strategyNoteKey = state.data.notes[0]?.noteKey || "";
+  }
+  return state.data.notes.find((note) => note.noteKey === state.strategyNoteKey) || null;
+}
+
+function renderStrategySelect() {
+  const select = document.getElementById("strategyNoteSelect");
+  if (!select) return;
+  const note = selectedStrategyNote();
+  select.innerHTML = state.data.notes.map((item) => (
+    `<option value="${escapeHtml(item.noteKey)}" ${item.noteKey === note?.noteKey ? "selected" : ""}>${escapeHtml(shortTitle(item.title))}</option>`
+  )).join("");
+}
+
+function factClass(fact) {
+  if (fact.band === "high") return fact.lowerIsBetter ? "fact-risk" : "fact-strong";
+  if (fact.band === "low") return fact.lowerIsBetter ? "fact-strong" : "fact-risk";
+  return "fact-normal";
+}
+
+function renderStrategyFacts(facts) {
+  const container = document.getElementById("strategyFacts");
+  const sample = document.getElementById("strategySampleSize");
+  if (!container || !sample) return;
+  sample.textContent = `${formatNumber(facts?.sampleSize || 0)} 篇`;
+  const items = facts?.facts || [];
+  container.innerHTML = items.map((fact) => `
+    <div class="fact-card ${factClass(fact)}">
+      <span>${escapeHtml(fact.label)}</span>
+      <strong>${escapeHtml(fact.valueText)}</strong>
+      <small>${escapeHtml(fact.conclusion)} · 中位数 ${escapeHtml(fact.medianText)}</small>
+    </div>
+  `).join("") || '<div class="empty-analysis">暂无足够数据生成事实判断。</div>';
+}
+
+function strategyResultHtml(result) {
+  if (!result) return '<div class="empty-analysis">尚未生成建议。</div>';
+  return `
+    <section class="strategy-conclusion">
+      <span class="strategy-eyebrow">本视频最值得复制的内容规律</span>
+      <h3>${escapeHtml(result.replicablePattern?.title || "-")}</h3>
+      <p>${escapeHtml(result.replicablePattern?.explanation || "-")}</p>
+    </section>
+    <section class="strategy-conclusion priority">
+      <span class="strategy-eyebrow">当前最优先解决的问题</span>
+      <h3>${escapeHtml(result.priorityProblem?.title || "-")}</h3>
+      <p>${escapeHtml(result.priorityProblem?.explanation || "-")}</p>
+    </section>
+    <section class="strategy-suggestions">
+      <span class="strategy-eyebrow">下一条内容建议</span>
+      <div class="suggestion-grid">
+        ${(result.suggestions || []).slice(0, 3).map((item) => `
+          <article class="suggestion-card">
+            <span class="suggestion-label">${escapeHtml(item.label)}</span>
+            <h4>${escapeHtml(item.title || "")}</h4>
+            <dl>
+              <div><dt>建议做什么</dt><dd>${escapeHtml(item.whatToDo || "-")}</dd></div>
+              <div><dt>为什么建议这样做</dt><dd>${escapeHtml(item.why || "-")}</dd></div>
+              <div><dt>它基于哪些数据</dt><dd>${escapeHtml(item.dataBasis || "-")}</dd></div>
+              <div><dt>下一次用什么指标验证</dt><dd>${escapeHtml(item.validationMetric || "-")}</dd></div>
+            </dl>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <div class="analysis-meta">${escapeHtml(result.model || "")}${result.analyzedAt ? ` · ${new Date(result.analyzedAt).toLocaleString("zh-CN")}` : ""}</div>
+  `;
+}
+
+function renderStrategyPayload({ preserveInputs = false } = {}) {
+  const payload = state.strategyPayload;
+  const note = selectedStrategyNote();
+  const analysis = payload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
+  const status = document.getElementById("strategyAiStatus");
+  if (status) {
+    status.textContent = payload?.ai?.configured
+      ? `${payload.ai.visionModel} / ${payload.ai.strategyModel}`
+      : "百炼未配置";
+    status.classList.toggle("warning", !payload?.ai?.configured);
+  }
+  renderStrategyFacts(payload?.facts);
+  document.getElementById("strategyCoverAnalysis").innerHTML = coverAnalysisHtml(analysis?.coverAnalysis, note);
+  document.getElementById("strategyResult").innerHTML = strategyResultHtml(analysis?.strategyAnalysis);
+  if (!preserveInputs) {
+    document.getElementById("strategyCaption").value = analysis?.inputs?.caption || "";
+    document.getElementById("strategyTranscript").value = analysis?.inputs?.transcript || "";
+  }
+}
+
+async function loadStrategyPayload() {
+  const note = selectedStrategyNote();
+  if (!note) return;
+  const requestedKey = note.noteKey;
+  document.getElementById("strategyActionStatus").textContent = "正在读取事实与本地分析...";
+  try {
+    const response = await fetch(`/api/content-strategy/${encodeURIComponent(requestedKey)}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "读取失败");
+    if (state.strategyNoteKey !== requestedKey) return;
+    state.strategyPayload = payload;
+    renderStrategyPayload();
+    document.getElementById("strategyActionStatus").textContent = "";
+  } catch (error) {
+    document.getElementById("strategyActionStatus").textContent = `读取失败：${error.message}`;
+  }
+}
+
+function renderStrategyAnalysis() {
+  renderStrategySelect();
+  loadStrategyPayload();
+}
+
+async function runCoverAnalysis(noteKey, button) {
+  const originalText = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "分析中...";
+  }
+  const status = document.getElementById("strategyActionStatus");
+  if (status && noteKey === state.strategyNoteKey) status.textContent = "正在将封面交给百炼进行视觉解读...";
+  try {
+    const response = await fetch("/api/content-strategy/cover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteKey })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "封面分析失败");
+    state.data.aiAnalysis ||= {};
+    state.data.aiAnalysis[noteKey] = payload.analysis;
+    state.coverAiNoteKey = noteKey;
+    if (state.strategyNoteKey === noteKey) {
+      state.strategyPayload = { ...(state.strategyPayload || {}), facts: payload.facts, analysis: payload.analysis };
+      renderStrategyPayload({ preserveInputs: true });
+      if (status) status.textContent = "封面分析已完成并保存到本地。";
+    }
+    renderCoverAnalysis();
+  } catch (error) {
+    if (status && noteKey === state.strategyNoteKey) status.textContent = `封面分析失败：${error.message}`;
+    else window.alert(`封面分析失败：${error.message}`);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
+async function generateStrategy() {
+  const button = document.getElementById("generateStrategyBtn");
+  const status = document.getElementById("strategyActionStatus");
+  button.disabled = true;
+  button.textContent = "分析中...";
+  status.textContent = "正在结合账号数据、封面解读和内容语境设计下一轮实验...";
+  try {
+    const response = await fetch("/api/content-strategy/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        noteKey: state.strategyNoteKey,
+        caption: document.getElementById("strategyCaption").value,
+        transcript: document.getElementById("strategyTranscript").value
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "策略分析失败");
+    state.data.aiAnalysis ||= {};
+    state.data.aiAnalysis[state.strategyNoteKey] = payload.analysis;
+    state.strategyPayload = { ...(state.strategyPayload || {}), facts: payload.facts, analysis: payload.analysis };
+    renderStrategyPayload({ preserveInputs: true });
+    status.textContent = "建议已生成并保存到本地。";
+  } catch (error) {
+    status.textContent = `生成失败：${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "生成下一条建议";
+  }
 }
 
 function renderSummary() {
@@ -1697,6 +1935,7 @@ function render() {
   renderFunnelAnalysis();
   renderCoverAnalysis();
   renderNotesCompare();
+  renderStrategyAnalysis();
   renderView();
 }
 
@@ -1748,6 +1987,15 @@ document.getElementById("coverSortSelect").addEventListener("change", (event) =>
   resetTablePage("cover");
   renderCoverAnalysis();
 });
+document.getElementById("strategyNoteSelect").addEventListener("change", (event) => {
+  state.strategyNoteKey = event.target.value;
+  state.strategyPayload = null;
+  loadStrategyPayload();
+});
+document.getElementById("analyzeCoverBtn").addEventListener("click", (event) => {
+  runCoverAnalysis(state.strategyNoteKey, event.currentTarget);
+});
+document.getElementById("generateStrategyBtn").addEventListener("click", generateStrategy);
 document.getElementById("notesCompareSearch").addEventListener("input", (event) => {
   state.notesCompareSearch = event.target.value;
   resetTablePage("notes");
@@ -1863,6 +2111,20 @@ document.addEventListener("click", (event) => {
   const reviewButton = event.target.closest("[data-review-note]");
   if (reviewButton) {
     openNoteReviewModal(reviewButton.dataset.reviewNote);
+    return;
+  }
+
+  const coverAiButton = event.target.closest("[data-cover-ai]");
+  if (coverAiButton) {
+    state.coverAiNoteKey = coverAiButton.dataset.coverAi;
+    renderCoverAiPanel();
+    document.getElementById("coverAiPanel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  const runCoverAiButton = event.target.closest("[data-run-cover-ai]");
+  if (runCoverAiButton) {
+    runCoverAnalysis(runCoverAiButton.dataset.runCoverAi, runCoverAiButton);
     return;
   }
 

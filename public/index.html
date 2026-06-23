@@ -44,6 +44,10 @@
               <span class="menu-icon">☷</span>
               数据总览
             </button>
+            <button class="menu-item" type="button" data-view="strategy">
+              <span class="menu-icon">✦</span>
+              下一条做什么
+            </button>
           </div>
 
           <div class="sidebar-tip">
@@ -173,6 +177,10 @@
             </aside>
           </div>
 
+          <div id="coverAiPanel" class="cover-ai-panel">
+            <div class="empty-analysis">选择一篇笔记并点击“AI 解读”，封面分析结果会保存在本地并展示在这里。</div>
+          </div>
+
           <div class="table-wrap cover-table-wrap">
             <table class="data-table cover-table">
               <thead>
@@ -187,12 +195,79 @@
                   <th data-table="cover" data-sort-key="interactionRate">互动率</th>
                   <th data-table="cover" data-sort-key="collectRate">收藏率</th>
                   <th data-table="cover" data-sort-key="diagnostics">诊断</th>
+                  <th>AI 解读</th>
                 </tr>
               </thead>
               <tbody id="coverBody"></tbody>
             </table>
           </div>
           <div id="coverPagination" class="pagination-bar"></div>
+        </section>
+
+        <section class="content-card view-panel hidden" data-panel="strategy">
+          <div class="panel-head">
+            <div>
+              <h2>下一条做什么内容</h2>
+              <p>规则层先确认数据事实，AI 再结合封面、文案和账号历史提出假设与下一轮实验。媒体下载和自动转写暂时跳过，可先手动补充文案或转写文本。</p>
+            </div>
+            <div class="toolbar">
+              <select id="strategyNoteSelect" class="select-input wide-select"></select>
+              <button id="analyzeCoverBtn" class="button" type="button">分析封面</button>
+              <button id="generateStrategyBtn" class="button primary" type="button">生成下一条建议</button>
+            </div>
+          </div>
+
+          <div class="strategy-workspace">
+            <section class="strategy-input-card">
+              <div class="strategy-section-head">
+                <div>
+                  <h3>内容语境</h3>
+                  <p>标题会自动带入；以下内容可选填。后续接入下载与 ASR 后会自动回填。</p>
+                </div>
+                <span id="strategyAiStatus" class="ai-status">读取中</span>
+              </div>
+              <label>
+                原文案 / 图文正文
+                <textarea id="strategyCaption" class="review-textarea" rows="5" placeholder="可选：粘贴原文案、图文正文或脚本"></textarea>
+              </label>
+              <label>
+                视频转写文本
+                <textarea id="strategyTranscript" class="review-textarea" rows="6" placeholder="可选：粘贴口播转写。自动分离音轨与 ASR 将在后续接入"></textarea>
+              </label>
+              <div id="strategyActionStatus" class="strategy-action-status"></div>
+            </section>
+
+            <section class="strategy-facts-card">
+              <div class="strategy-section-head">
+                <div>
+                  <h3>程序确认的数据事实</h3>
+                  <p>与当前账号样本的中位数、前 25% 和后 25% 比较。</p>
+                </div>
+                <span id="strategySampleSize" class="median-sample">-</span>
+              </div>
+              <div id="strategyFacts" class="fact-grid"></div>
+            </section>
+
+            <section class="strategy-cover-card">
+              <div class="strategy-section-head">
+                <div>
+                  <h3>AI 封面解读</h3>
+                  <p>模型只负责解释视觉语境并提出假设，点击率事实仍来自数据层。</p>
+                </div>
+              </div>
+              <div id="strategyCoverAnalysis" class="analysis-body empty-analysis">尚未分析封面。</div>
+            </section>
+
+            <section class="strategy-result-card">
+              <div class="strategy-section-head">
+                <div>
+                  <h3>内容实验建议</h3>
+                  <p>每条建议必须说明做什么、为什么、依据和验证指标。</p>
+                </div>
+              </div>
+              <div id="strategyResult" class="strategy-result empty-analysis">尚未生成建议。</div>
+            </section>
+          </div>
         </section>
 
         <section class="content-card view-panel hidden" data-panel="notes">
