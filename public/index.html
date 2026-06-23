@@ -208,7 +208,7 @@
           <div class="panel-head">
             <div>
               <h2>下一条做什么内容</h2>
-              <p>规则层先确认数据事实，AI 再结合封面、文案和账号历史提出假设与下一轮实验。媒体下载和自动转写暂时跳过，可先手动补充文案或转写文本。</p>
+              <p>规则层先确认数据事实，AI 再结合封面、文案和账号历史提出假设与下一轮实验。已导出的中文字幕会自动带入视频转写文本。</p>
             </div>
             <div class="toolbar">
               <select id="strategyNoteSelect" class="select-input wide-select"></select>
@@ -222,17 +222,17 @@
               <div class="strategy-section-head">
                 <div>
                   <h3>内容语境</h3>
-                  <p>标题会自动带入；以下内容可选填。后续接入下载与 ASR 后会自动回填。</p>
+                  <p>标题会自动带入；视频优先读取 Profile 导出目录中的中文字幕，也可继续手动修改。</p>
                 </div>
                 <span id="strategyAiStatus" class="ai-status">读取中</span>
               </div>
               <label>
                 原文案 / 图文正文
-                <textarea id="strategyCaption" class="review-textarea" rows="5" placeholder="可选：粘贴原文案、图文正文或脚本"></textarea>
+                <textarea id="strategyCaption" class="review-textarea" rows="5"></textarea>
               </label>
               <label>
                 视频转写文本
-                <textarea id="strategyTranscript" class="review-textarea" rows="6" placeholder="可选：粘贴口播转写。自动分离音轨与 ASR 将在后续接入"></textarea>
+                <textarea id="strategyTranscript" class="review-textarea" rows="6"></textarea>
               </label>
               <div id="strategyActionStatus" class="strategy-action-status"></div>
             </section>

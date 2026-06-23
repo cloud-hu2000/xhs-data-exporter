@@ -82,6 +82,7 @@ xhs-data-exporter/
 │  ├─ import-xhs-data.js                   # Excel 解析、合并、派生指标、生命周期
 │  ├─ note-review-store.js                 # 人工复盘标签存储
 │  ├─ content-strategy.js                  # 统计事实、分位数和证据目录
+│  ├─ profile-transcript.js                 # Profile 中文字幕关联与 SRT 清洗
 │  ├─ bailian-client.js                    # 百炼请求、模型输出校验
 │  ├─ ai-analysis-store.js                 # AI 分析结果存储
 │  └─ dashboard-server.js                  # Express API 与静态站点
@@ -198,6 +199,11 @@ xhs-data-exporter/
 - `src/content-strategy.js`
   - 计算目标笔记在账号内部的 Q1、中位数、Q3、分位排名。
   - 生成可引用的 evidence ID，限制模型只能使用已计算事实。
+- `src/profile-transcript.js`
+  - 按统一数据中的标题/`noteKey` 关联 `profile-exports/manifest.json`。
+  - 优先读取对应作品的 `subtitle-zh-CN-*.srt`，移除字幕序号和时间轴，并用中文逗号连接字幕段落。
+  - 找不到中文字幕时读取同目录 `metadata.json.description`，作为“原文案 / 图文正文”回填。
+  - 策略详情 API 将结果作为 `automaticTranscript` 或 `automaticCaption` 返回；前端优先回填，没有时才使用历史手工输入。
 - `src/bailian-client.js`
   - 从 `.env`/环境变量读取模型配置。
   - 封面分析先尝试把远程图片转为 data URL，失败时回退原 URL。
@@ -211,7 +217,7 @@ xhs-data-exporter/
 | `GET /api/data` | 获取装饰后的完整数据 | unified data + reviews + AI |
 | `POST /api/import` | 重新扫描下载目录并导入 | 写 unified data/CSV |
 | `POST /api/note-reviews` | 保存某篇笔记的人工复盘 | 写 `note-reviews.json` |
-| `GET /api/content-strategy/:noteKey` | 获取规则事实、缓存分析和模型状态 | 读主数据与 AI 缓存 |
+| `GET /api/content-strategy/:noteKey` | 获取规则事实、自动中文字幕、缓存分析和模型状态 | 读主数据、Profile 字幕与 AI 缓存 |
 | `POST /api/content-strategy/cover` | 调用视觉模型分析封面 | 写 AI 分析 |
 | `POST /api/content-strategy/recommend` | 调用文本模型生成下一条建议 | 写 AI 分析 |
 
@@ -338,6 +344,7 @@ Profile 导出使用：
 - `content-strategy.test.js`：账号内事实分位和 evidence catalog。
 - `note-review-store.test.js`：复盘保存、自定义选项、重新装饰数据。
 - `playwright-utils.test.js`：超长导出文件名保留固定后缀和扩展名。
+- `profile-transcript.test.js`：SRT 时间轴清洗、标题关联和中文字幕优先读取。
 
 尚无自动化覆盖：
 

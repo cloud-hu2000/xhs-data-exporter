@@ -1002,8 +1002,14 @@ function renderStrategyPayload({ preserveInputs = false } = {}) {
   document.getElementById("strategyCoverAnalysis").innerHTML = coverAnalysisHtml(analysis?.coverAnalysis, note);
   document.getElementById("strategyResult").innerHTML = strategyResultHtml(analysis?.strategyAnalysis);
   if (!preserveInputs) {
-    document.getElementById("strategyCaption").value = analysis?.inputs?.caption || "";
-    document.getElementById("strategyTranscript").value = analysis?.inputs?.transcript || "";
+    document.getElementById("strategyCaption").value =
+      payload?.automaticCaption?.caption ||
+      analysis?.inputs?.caption ||
+      "";
+    document.getElementById("strategyTranscript").value =
+      payload?.automaticTranscript?.transcript ||
+      analysis?.inputs?.transcript ||
+      "";
   }
 }
 

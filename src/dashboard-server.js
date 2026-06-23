@@ -5,6 +5,7 @@ const { loadEnv } = require("./env");
 const { importData, dataDir } = require("./import-xhs-data");
 const { createNoteReviewStore } = require("./note-review-store");
 const { createAiAnalysisStore } = require("./ai-analysis-store");
+const { createProfileTranscriptReader } = require("./profile-transcript");
 const { buildEvidenceCatalog, buildFactDiagnostics, compactAccountContext } = require("./content-strategy");
 const Bailian = require("./bailian-client");
 
@@ -17,6 +18,7 @@ const aiAnalysisPath = path.join(dataDir, "ai-content-analysis.json");
 const port = Number(process.env.XHS_DASHBOARD_PORT || 5178);
 const noteReviewStore = createNoteReviewStore(noteReviewPath);
 const aiAnalysisStore = createAiAnalysisStore(aiAnalysisPath);
+const profileTranscriptReader = createProfileTranscriptReader(projectRoot);
 
 function readData() {
   if (!fs.existsSync(dataPath)) {
@@ -70,6 +72,7 @@ app.get("/api/content-strategy/:noteKey", (req, res) => {
   try {
     const context = analysisContext(req.params.noteKey);
     const settings = Bailian.config();
+    const automaticContent = profileTranscriptReader.get(context.note);
     res.json({
       note: {
         noteKey: context.note.noteKey,
@@ -78,6 +81,12 @@ app.get("/api/content-strategy/:noteKey", (req, res) => {
       },
       facts: context.facts,
       analysis: context.cached,
+      automaticTranscript: automaticContent?.transcript
+        ? automaticContent
+        : null,
+      automaticCaption: automaticContent?.caption
+        ? automaticContent
+        : null,
       ai: {
         configured: Boolean(settings.apiKey),
         visionModel: settings.visionModel,
