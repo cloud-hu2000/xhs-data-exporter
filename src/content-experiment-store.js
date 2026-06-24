@@ -37,25 +37,20 @@ function noteSnapshot(note) {
 }
 
 function normalizeExperiment(input = {}, now = new Date().toISOString()) {
-  const suggestion = input.suggestion || input;
+  const suggestion = input.suggestion || {};
   return {
     id: cleanText(input.id, 80),
     sourceNoteKey: cleanText(input.sourceNoteKey, 200),
     sourceTitle: cleanText(input.sourceTitle, 300),
-    suggestionLabel: cleanText(suggestion.label || input.suggestionLabel, 40),
-    deliveryTitle: cleanText(suggestion.deliveryTitle || suggestion.title || input.deliveryTitle, 160),
-    coverPrompt: cleanText(suggestion.coverPrompt || input.coverPrompt, 1200),
-    firstFiveSecondsOpening: cleanText(
-      suggestion.firstFiveSecondsOpening || suggestion.firstFiveSeconds || input.firstFiveSecondsOpening,
-      800
-    ),
-    contentStructure: cleanList(suggestion.contentStructure || input.contentStructure, 8, 360),
-    publishTime: cleanText(suggestion.publishTime || input.publishTime, 160),
-    validationMetrics: cleanList(suggestion.validationMetrics || suggestion.validationMetric || input.validationMetrics, 8, 260),
-    whatToDo: cleanText(suggestion.whatToDo || input.whatToDo, 1000),
-    why: cleanText(suggestion.why || input.why, 1000),
-    dataBasis: cleanText(suggestion.dataBasis || input.dataBasis, 1400),
-    evidenceIds: cleanList(suggestion.evidenceIds || input.evidenceIds, 12, 120),
+    delivery_title: cleanText(suggestion.delivery_title || input.delivery_title, 160),
+    cover_prompt: cleanText(suggestion.cover_prompt || input.cover_prompt, 1200),
+    opening_hook: cleanText(suggestion.opening_hook || input.opening_hook, 800),
+    content_structure: cleanList(suggestion.content_structure || input.content_structure, 8, 360),
+    publish_time: cleanText(suggestion.publish_time || input.publish_time, 160),
+    success_metrics: cleanList(suggestion.success_metrics || input.success_metrics, 8, 260),
+    recommended_actions: cleanText(suggestion.recommended_actions || input.recommended_actions, 1000),
+    rationale: cleanText(suggestion.rationale || input.rationale, 1000),
+    data_basis: cleanText(suggestion.data_basis || input.data_basis, 1400),
     matchedNoteKey: cleanText(input.matchedNoteKey, 200),
     matchedAt: cleanText(input.matchedAt, 60),
     verificationSnapshot: input.verificationSnapshot || null,
@@ -96,7 +91,7 @@ function createContentExperimentStore(filePath) {
       ...input,
       id: `exp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
     }, now);
-    if (!experiment.deliveryTitle) throw new Error("缺少交付标题");
+    if (!experiment.delivery_title) throw new Error("缺少交付标题");
     database.experiments.unshift(experiment);
     write(database);
     return experiment;

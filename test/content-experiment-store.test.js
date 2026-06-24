@@ -13,21 +13,24 @@ const created = store.create({
   sourceTitle: "旧笔记",
   suggestion: {
     label: "方案 A",
-    deliveryTitle: "AI 工具避坑清单",
-    coverPrompt: "大字标题，突出避坑",
-    firstFiveSecondsOpening: "先抛出反常识结论",
-    contentStructure: ["问题", "错误做法", "正确动作"],
-    publishTime: "周二 20:00",
-    validationMetrics: ["官方封面点击率高于账号中位数", "收藏率进入同类前 25%"],
-    evidenceIds: ["note-0.views"],
-    dataBasis: "历史同类内容收藏率更高"
+    delivery_title: "AI 工具避坑清单",
+    cover_prompt: "大字标题，突出避坑",
+    opening_hook: "先抛出反常识结论",
+    content_structure: "问题-错误做法-正确动作",
+    publish_time: "周二 20:00",
+    success_metrics: "官方封面点击率高于账号中位数；收藏率进入同类前 25%",
+    recommended_actions: "用避坑清单重做一条工具教程",
+    rationale: "历史同类内容收藏率更高",
+    data_basis: "历史同类内容收藏率更高"
   }
 });
 
 assert(created.id);
 assert.equal(created.status, "planned");
-assert.equal(created.deliveryTitle, "AI 工具避坑清单");
-assert.deepEqual(created.contentStructure, ["问题", "错误做法", "正确动作"]);
+assert.equal(created.delivery_title, "AI 工具避坑清单");
+assert.deepEqual(created.content_structure, ["问题-错误做法-正确动作"]);
+assert.deepEqual(created.success_metrics, ["官方封面点击率高于账号中位数", "收藏率进入同类前 25%"]);
+assert.equal(created.recommended_actions, "用避坑清单重做一条工具教程");
 assert.equal(store.list().length, 1);
 
 const matched = store.match(created.id, {

@@ -991,20 +991,20 @@ function strategyResultHtml(result) {
         ${(result.suggestions || []).slice(0, 3).map((item, index) => `
           <article class="suggestion-card">
             <div class="suggestion-card-head">
-              <span class="suggestion-label">${escapeHtml(item.label)}</span>
+              <span class="suggestion-label">方案 ${String.fromCharCode(65 + index)}</span>
               <button class="button primary ai-table-button" type="button" data-start-experiment="${index}">开始实验</button>
             </div>
-            <h4>${escapeHtml(item.deliveryTitle || item.title || "")}</h4>
+            <h4>${escapeHtml(item.delivery_title || "-")}</h4>
             <dl>
-              <div><dt>交付标题</dt><dd>${escapeHtml(item.deliveryTitle || item.title || "-")}</dd></div>
-              <div><dt>封面提示词</dt><dd>${escapeHtml(item.coverPrompt || "-")}</dd></div>
-              <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(item.firstFiveSecondsOpening || "-")}</dd></div>
-              <div><dt>内容结构</dt><dd>${compactListHtml(item.contentStructure)}</dd></div>
-              <div><dt>发布时间</dt><dd>${escapeHtml(item.publishTime || "-")}</dd></div>
-              <div><dt>验证指标</dt><dd>${compactListHtml(item.validationMetrics || item.validationMetric)}</dd></div>
-              <div><dt>建议做什么</dt><dd>${escapeHtml(item.whatToDo || "-")}</dd></div>
-              <div><dt>为什么建议这样做</dt><dd>${escapeHtml(item.why || "-")}</dd></div>
-              <div><dt>它基于哪些数据</dt><dd>${escapeHtml(item.dataBasis || "-")}</dd></div>
+              <div><dt>交付标题</dt><dd>${escapeHtml(item.delivery_title || "-")}</dd></div>
+              <div><dt>封面提示词</dt><dd>${escapeHtml(item.cover_prompt || "-")}</dd></div>
+              <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(item.opening_hook || "-")}</dd></div>
+              <div><dt>内容结构</dt><dd>${compactListHtml(item.content_structure)}</dd></div>
+              <div><dt>发布时间</dt><dd>${escapeHtml(item.publish_time || "-")}</dd></div>
+              <div><dt>验证指标</dt><dd>${compactListHtml(item.success_metrics)}</dd></div>
+              <div><dt>建议做什么</dt><dd>${escapeHtml(item.recommended_actions || "-")}</dd></div>
+              <div><dt>为什么建议这样做</dt><dd>${escapeHtml(item.rationale || "-")}</dd></div>
+              <div><dt>它基于哪些数据</dt><dd>${escapeHtml(item.data_basis || "-")}</dd></div>
             </dl>
           </article>
         `).join("")}
@@ -1102,23 +1102,33 @@ async function runCoverAnalysis(noteKey, button) {
 async function generateStrategy() {
   const button = document.getElementById("generateStrategyBtn");
   const status = document.getElementById("strategyActionStatus");
+  const noteKey = state.strategyNoteKey;
   button.disabled = true;
   button.textContent = "分析中...";
   status.textContent = "正在结合账号数据、封面解读和内容语境设计下一轮实验...";
+  state.strategyPayload = {
+    ...(state.strategyPayload || {}),
+    analysis: {
+      ...(state.strategyPayload?.analysis || {}),
+      strategyAnalysis: null
+    }
+  };
+  renderStrategyPayload({ preserveInputs: true });
   try {
     const response = await fetch("/api/content-strategy/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        noteKey: state.strategyNoteKey,
+        noteKey,
         caption: document.getElementById("strategyCaption").value,
         transcript: document.getElementById("strategyTranscript").value
       })
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "策略分析失败");
+    if (state.strategyNoteKey !== noteKey) return;
     state.data.aiAnalysis ||= {};
-    state.data.aiAnalysis[state.strategyNoteKey] = payload.analysis;
+    state.data.aiAnalysis[noteKey] = payload.analysis;
     state.strategyPayload = { ...(state.strategyPayload || {}), facts: payload.facts, analysis: payload.analysis };
     renderStrategyPayload({ preserveInputs: true });
     status.textContent = "建议已生成并保存到本地。";
@@ -1216,18 +1226,18 @@ function experimentCardHtml(experiment) {
       <div class="experiment-card-head">
         <div>
           <span class="experiment-status ${isVerified ? "verified" : ""}">${isVerified ? "已验证" : "待验证"}</span>
-          <h3>${escapeHtml(experiment.deliveryTitle || "未命名实验")}</h3>
+          <h3>${escapeHtml(experiment.delivery_title || "未命名实验")}</h3>
           <p>${escapeHtml(experiment.sourceTitle ? `来源：${experiment.sourceTitle}` : "来源：AI 内容建议")}</p>
         </div>
         <span class="analysis-meta">${experiment.createdAt ? new Date(experiment.createdAt).toLocaleString("zh-CN") : ""}</span>
       </div>
       <dl class="experiment-definition-list">
-        <div><dt>封面提示词</dt><dd>${escapeHtml(experiment.coverPrompt || "-")}</dd></div>
-        <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(experiment.firstFiveSecondsOpening || "-")}</dd></div>
-        <div><dt>内容结构</dt><dd>${compactListHtml(experiment.contentStructure)}</dd></div>
-        <div><dt>发布时间</dt><dd>${escapeHtml(experiment.publishTime || "-")}</dd></div>
-        <div><dt>验证指标</dt><dd>${compactListHtml(experiment.validationMetrics)}</dd></div>
-        <div><dt>数据依据</dt><dd>${escapeHtml(experiment.dataBasis || "-")}</dd></div>
+        <div><dt>封面提示词</dt><dd>${escapeHtml(experiment.cover_prompt || "-")}</dd></div>
+        <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(experiment.opening_hook || "-")}</dd></div>
+        <div><dt>内容结构</dt><dd>${compactListHtml(experiment.content_structure)}</dd></div>
+        <div><dt>发布时间</dt><dd>${escapeHtml(experiment.publish_time || "-")}</dd></div>
+        <div><dt>验证指标</dt><dd>${compactListHtml(experiment.success_metrics)}</dd></div>
+        <div><dt>数据依据</dt><dd>${escapeHtml(experiment.data_basis || "-")}</dd></div>
       </dl>
       <div class="experiment-match-panel">
         <div>

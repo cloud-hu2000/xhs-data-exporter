@@ -1,4 +1,5 @@
 const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const { writeDebugLog } = require("./debug-logger");
 
 function config() {
   return {
@@ -23,30 +24,66 @@ function extractJson(text) {
 
 async function chatCompletion({ model, messages, json = true, timeoutMs = 90000 }) {
   const settings = config();
-  if (!settings.apiKey) throw new Error("未配置 DASHSCOPE_API_KEY");
+  if (!settings.apiKey) {
+    writeDebugLog("bailian", "chatCompletion.missingApiKey", { model, json, timeoutMs });
+    throw new Error("未配置 DASHSCOPE_API_KEY");
+  }
+  const endpoint = `${settings.baseUrl}/chat/completions`;
+  const requestBody = {
+    model,
+    messages,
+    temperature: 0.25,
+    ...(json ? { response_format: { type: "json_object" } } : {})
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
   try {
-    const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+    writeDebugLog("bailian", "chatCompletion.request", {
+      endpoint,
+      model,
+      json,
+      timeoutMs,
+      body: requestBody
+    });
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${settings.apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.25,
-        ...(json ? { response_format: { type: "json_object" } } : {})
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal
     });
     const payload = await response.json().catch(() => ({}));
+    writeDebugLog("bailian", "chatCompletion.response", {
+      endpoint,
+      model,
+      status: response.status,
+      ok: response.ok,
+      durationMs: Date.now() - startedAt,
+      payload
+    });
     if (!response.ok) {
       throw new Error(payload?.error?.message || payload?.message || `AI请求失败（${response.status}）`);
     }
     const content = payload?.choices?.[0]?.message?.content;
-    return json ? extractJson(content) : content;
+    const result = json ? extractJson(content) : content;
+    writeDebugLog("bailian", "chatCompletion.result", {
+      model,
+      durationMs: Date.now() - startedAt,
+      content,
+      result
+    });
+    return result;
+  } catch (error) {
+    writeDebugLog("bailian", "chatCompletion.error", {
+      endpoint,
+      model,
+      durationMs: Date.now() - startedAt,
+      error
+    });
+    throw error;
   } finally {
     clearTimeout(timer);
   }
@@ -55,6 +92,7 @@ async function chatCompletion({ model, messages, json = true, timeoutMs = 90000 
 async function imageInput(url) {
   if (!url) throw new Error("当前笔记没有封面 URL");
   try {
+    writeDebugLog("bailian", "imageInput.request", { url });
     const response = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: AbortSignal.timeout(30000)
@@ -63,14 +101,28 @@ async function imageInput(url) {
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.length > 10 * 1024 * 1024) throw new Error("封面图片超过 10MB");
     const mime = response.headers.get("content-type") || "image/jpeg";
+    writeDebugLog("bailian", "imageInput.response", {
+      url,
+      status: response.status,
+      mime,
+      bytes: bytes.length,
+      mode: "data-url"
+    });
     return `data:${mime};base64,${bytes.toString("base64")}`;
-  } catch {
+  } catch (error) {
+    writeDebugLog("bailian", "imageInput.fallback", { url, error, mode: "remote-url" });
     return url;
   }
 }
 
 async function analyzeCover(note, facts) {
   const settings = config();
+  writeDebugLog("bailian", "analyzeCover.start", {
+    noteKey: note.noteKey,
+    title: note.title || "",
+    coverImageUrl: note.coverImageUrl || "",
+    facts
+  });
   const imageUrl = await imageInput(note.coverImageUrl);
   const result = await chatCompletion({
     model: settings.visionModel,
@@ -91,7 +143,13 @@ async function analyzeCover(note, facts) {
       }
     ]
   });
-  return { ...result, model: settings.visionModel, analyzedAt: new Date().toISOString() };
+  const analysis = { ...result, model: settings.visionModel, analyzedAt: new Date().toISOString() };
+  writeDebugLog("bailian", "analyzeCover.done", {
+    noteKey: note.noteKey,
+    model: settings.visionModel,
+    analysis
+  });
+  return analysis;
 }
 
 function evidenceText(ids, evidenceById) {
@@ -110,9 +168,79 @@ function normalizeTextList(value) {
   return source.map((item) => String(item || "").trim()).filter(Boolean);
 }
 
+function normalizeTextBlock(value) {
+  if (Array.isArray(value)) return normalizeTextList(value).join("；");
+  return String(value || "").trim();
+}
+
+const SUGGESTION_FIELDS = [
+  "delivery_title",
+  "cover_prompt",
+  "opening_hook",
+  "content_structure",
+  "publish_time",
+  "success_metrics",
+  "recommended_actions",
+  "rationale",
+  "data_basis"
+];
+
+const LEGACY_SUGGESTION_FIELDS = [
+  "label",
+  "title",
+  "deliveryTitle",
+  "coverPrompt",
+  "firstFiveSecondsOpening",
+  "firstFiveSeconds",
+  "contentStructure",
+  "publishTime",
+  "validationMetrics",
+  "validationMetric",
+  "whatToDo",
+  "why",
+  "dataBasis",
+  "evidenceIds",
+  "evidence"
+];
+
+function hasNewSuggestionShape(item) {
+  return Boolean(item && SUGGESTION_FIELDS.some((key) => item[key] != null));
+}
+
+function legacySuggestionKeys(item) {
+  if (!item) return [];
+  return LEGACY_SUGGESTION_FIELDS.filter((key) => item[key] != null);
+}
+
+function normalizeSuggestion(item) {
+  return {
+    delivery_title: String(item?.delivery_title || "").trim(),
+    cover_prompt: String(item?.cover_prompt || "").trim(),
+    opening_hook: String(item?.opening_hook || "").trim(),
+    content_structure: normalizeTextBlock(item?.content_structure),
+    publish_time: String(item?.publish_time || "").trim(),
+    success_metrics: normalizeTextBlock(item?.success_metrics),
+    recommended_actions: normalizeTextBlock(item?.recommended_actions),
+    rationale: String(item?.rationale || "").trim(),
+    data_basis: String(item?.data_basis || "").trim()
+  };
+}
+
 function validateRecommendation(result, evidenceCatalog) {
   const evidenceById = new Map(evidenceCatalog.map((item) => [item.id, item]));
-  const suggestions = Array.isArray(result?.suggestions) ? result.suggestions.slice(0, 3) : [];
+  const rawSuggestions = Array.isArray(result?.suggestions)
+    ? result.suggestions
+    : hasNewSuggestionShape(result)
+      ? [result]
+      : [];
+  const legacyKeys = rawSuggestions.flatMap(legacySuggestionKeys);
+  if (legacyKeys.length > 0) {
+    throw new Error(`模型返回了旧版 suggestions 字段：${[...new Set(legacyKeys)].join("、")}`);
+  }
+  if (rawSuggestions.some((item) => !hasNewSuggestionShape(item))) {
+    throw new Error("模型未按新版 suggestions 字段返回内容实验方案");
+  }
+  const suggestions = rawSuggestions.slice(0, 3).map(normalizeSuggestion);
   const patternEvidence = evidenceText(result?.replicablePattern?.evidenceIds, evidenceById);
   const problemEvidence = evidenceText(result?.priorityProblem?.evidenceIds, evidenceById);
   return {
@@ -126,25 +254,7 @@ function validateRecommendation(result, evidenceCatalog) {
       explanation: String(result?.priorityProblem?.explanation || ""),
       ...problemEvidence
     },
-    suggestions: suggestions.map((item, index) => {
-      const evidence = evidenceText(item?.evidenceIds, evidenceById);
-      const deliveryTitle = String(item?.deliveryTitle || item?.title || "");
-      const validationMetrics = normalizeTextList(item?.validationMetrics || item?.validationMetric);
-      return {
-        label: String(item?.label || `方案 ${String.fromCharCode(65 + index)}`),
-        title: deliveryTitle,
-        deliveryTitle,
-        coverPrompt: String(item?.coverPrompt || ""),
-        firstFiveSecondsOpening: String(item?.firstFiveSecondsOpening || item?.firstFiveSeconds || ""),
-        contentStructure: normalizeTextList(item?.contentStructure),
-        publishTime: String(item?.publishTime || ""),
-        whatToDo: String(item?.whatToDo || ""),
-        why: String(item?.why || ""),
-        ...evidence,
-        validationMetric: validationMetrics.join("；"),
-        validationMetrics
-      };
-    })
+    suggestions
   };
 }
 
@@ -163,6 +273,12 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
     accountContext,
     evidenceCatalog
   };
+  writeDebugLog("bailian", "analyzeStrategy.start", {
+    noteKey: note.noteKey,
+    title: note.title || "",
+    model: settings.strategyModel,
+    input
+  });
   const result = await chatCompletion({
     model: settings.strategyModel,
     messages: [
@@ -172,27 +288,54 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
           "你是内容策略分析师。规则与数据层给出的指标是事实，不得修改或虚构。",
           "你的职责是理解账号语境、提出解释性假设，并设计下一轮可验证实验。",
           "不要把相关性说成因果。证据不足时明确写“假设”。",
-          "所有数据判断只能引用 evidenceCatalog 中存在的证据 ID，不得自行计算、估算、错配标题或补充平台不存在的指标。",
+          "所有数据判断只能引用 evidenceCatalog 中存在的事实，不得自行计算、估算、错配标题或补充平台不存在的指标。",
           "必须返回 JSON，建议最多三条。",
-          "每条建议必须是可直接执行的内容实验方案，并格式化包含：交付标题、封面提示词、前5秒开头要求、内容结构、发布时间、验证指标、做什么、为什么和 evidenceIds。"
+          "每条 suggestions 建议必须是可直接执行的内容实验方案，并且只使用固定 snake_case 字段：delivery_title、cover_prompt、opening_hook、content_structure、publish_time、success_metrics、recommended_actions、rationale、data_basis。",
+          "禁止在 suggestions 里输出 title、whatToDo、why、validationMetric、evidenceIds、evidence、label 或其他字段。",
+          "data_basis 必须写清引用了哪些 evidenceCatalog 事实。"
         ].join("\n")
       },
       {
         role: "user",
-        content: `根据以下 JSON 生成内容策略：${JSON.stringify(input)}\n返回 JSON，结构固定为：{"replicablePattern":{"title":"","explanation":"","evidenceIds":["证据ID"]},"priorityProblem":{"title":"","explanation":"","evidenceIds":["证据ID"]},"suggestions":[{"label":"方案 A","deliveryTitle":"","coverPrompt":"","firstFiveSecondsOpening":"","contentStructure":["结构步骤1","结构步骤2"],"publishTime":"","validationMetrics":["指标1","指标2"],"whatToDo":"","why":"","evidenceIds":["证据ID"]}]}。evidenceIds 只能从 evidenceCatalog.id 原样选择；validationMetrics 必须写清本次实验要观察的具体指标和判断口径。`
+        content: [
+          `根据以下 JSON 生成内容策略：${JSON.stringify(input)}`,
+          "返回 JSON，结构固定为：",
+          '{"replicablePattern":{"title":"","explanation":"","evidenceIds":["证据ID"]},"priorityProblem":{"title":"","explanation":"","evidenceIds":["证据ID"]},"suggestions":[{"delivery_title":"","cover_prompt":"","opening_hook":"","content_structure":"","publish_time":"","success_metrics":"","recommended_actions":"","rationale":"","data_basis":""}]}',
+          "suggestions 数组里的每一个方案必须严格对应下面这个字段说明示例；字段名必须一字不差，字段值必须换成你的真实建议，不要照抄 string 或注释：",
+          JSON.stringify({
+            delivery_title: "string // 交付标题，如：'Q2增长实操指南'",
+            cover_prompt: "string // 封面提示词，用于生成视觉封面的关键词或指令",
+            opening_hook: "string // 前5秒开头文案，用于抓住观众注意力的钩子",
+            content_structure: "string // 内容结构，如：'问题-方案-案例-总结'",
+            publish_time: "string // 建议发布时间，如：'2026-07-01 10:00'",
+            success_metrics: "string // 验证指标，如：'CTR>5%, 完播率>40%'",
+            recommended_actions: "string // 建议执行的具体动作列表",
+            rationale: "string // 为什么建议这样做的原因说明",
+            data_basis: "string // 决策所基于的数据来源或关键数据点"
+          }),
+          "content_structure 必须是字符串，例如“问题-方案-案例-总结”。success_metrics 必须写清具体指标和判断口径。data_basis 只能引用 evidenceCatalog 中已给出的事实。"
+        ].join("\n")
       }
     ]
   });
-  return {
+  const analysis = {
     ...validateRecommendation(result, evidenceCatalog),
     model: settings.strategyModel,
     analyzedAt: new Date().toISOString()
   };
+  writeDebugLog("bailian", "analyzeStrategy.done", {
+    noteKey: note.noteKey,
+    model: settings.strategyModel,
+    rawResult: result,
+    analysis
+  });
+  return analysis;
 }
 
 module.exports = {
   analyzeCover,
   analyzeStrategy,
   config,
-  extractJson
+  extractJson,
+  validateRecommendation
 };
