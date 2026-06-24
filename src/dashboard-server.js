@@ -5,6 +5,7 @@ const { loadEnv } = require("./env");
 const { importData, dataDir } = require("./import-xhs-data");
 const { createNoteReviewStore } = require("./note-review-store");
 const { createAiAnalysisStore } = require("./ai-analysis-store");
+const { createContentExperimentStore } = require("./content-experiment-store");
 const { createProfileTranscriptReader } = require("./profile-transcript");
 const { buildEvidenceCatalog, buildFactDiagnostics, compactAccountContext } = require("./content-strategy");
 const Bailian = require("./bailian-client");
@@ -15,9 +16,11 @@ const publicDir = path.join(projectRoot, "public");
 const dataPath = path.join(dataDir, "xhs-unified-data.json");
 const noteReviewPath = path.join(dataDir, "note-reviews.json");
 const aiAnalysisPath = path.join(dataDir, "ai-content-analysis.json");
+const contentExperimentPath = path.join(dataDir, "content-experiments.json");
 const port = Number(process.env.XHS_DASHBOARD_PORT || 5178);
 const noteReviewStore = createNoteReviewStore(noteReviewPath);
 const aiAnalysisStore = createAiAnalysisStore(aiAnalysisPath);
+const contentExperimentStore = createContentExperimentStore(contentExperimentPath);
 const profileTranscriptReader = createProfileTranscriptReader(projectRoot);
 
 function readData() {
@@ -30,7 +33,8 @@ function readData() {
 function readDecoratedData() {
   return {
     ...noteReviewStore.decorateDatabase(readData()),
-    aiAnalysis: aiAnalysisStore.list()
+    aiAnalysis: aiAnalysisStore.list(),
+    contentExperiments: contentExperimentStore.list()
   };
 }
 
@@ -56,7 +60,11 @@ app.get("/api/data", (req, res) => {
 });
 
 app.post("/api/import", (req, res) => {
-  res.json(noteReviewStore.decorateDatabase(importData()));
+  res.json({
+    ...noteReviewStore.decorateDatabase(importData()),
+    aiAnalysis: aiAnalysisStore.list(),
+    contentExperiments: contentExperimentStore.list()
+  });
 });
 
 app.post("/api/note-reviews", (req, res) => {
@@ -134,6 +142,29 @@ app.post("/api/content-strategy/recommend", async (req, res) => {
       strategyAnalysis
     });
     res.json({ facts: context.facts, analysis: saved });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/content-experiments", (req, res) => {
+  res.json({ experiments: contentExperimentStore.list() });
+});
+
+app.post("/api/content-experiments", (req, res) => {
+  try {
+    res.json({ experiment: contentExperimentStore.create(req.body || {}) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch("/api/content-experiments/:experimentId/match", (req, res) => {
+  try {
+    const database = readDecoratedData();
+    const note = database.notes.find((item) => item.noteKey === req.body?.noteKey);
+    if (!note) throw new Error("未找到匹配笔记");
+    res.json({ experiment: contentExperimentStore.match(req.params.experimentId, note) });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

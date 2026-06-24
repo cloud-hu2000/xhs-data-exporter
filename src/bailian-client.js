@@ -43,7 +43,7 @@ async function chatCompletion({ model, messages, json = true, timeoutMs = 90000 
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload?.error?.message || payload?.message || `百炼请求失败（${response.status}）`);
+      throw new Error(payload?.error?.message || payload?.message || `AI请求失败（${response.status}）`);
     }
     const content = payload?.choices?.[0]?.message?.content;
     return json ? extractJson(content) : content;
@@ -105,6 +105,11 @@ function evidenceText(ids, evidenceById) {
   };
 }
 
+function normalizeTextList(value) {
+  const source = Array.isArray(value) ? value : String(value || "").split(/\n|；|;/);
+  return source.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
 function validateRecommendation(result, evidenceCatalog) {
   const evidenceById = new Map(evidenceCatalog.map((item) => [item.id, item]));
   const suggestions = Array.isArray(result?.suggestions) ? result.suggestions.slice(0, 3) : [];
@@ -123,13 +128,21 @@ function validateRecommendation(result, evidenceCatalog) {
     },
     suggestions: suggestions.map((item, index) => {
       const evidence = evidenceText(item?.evidenceIds, evidenceById);
+      const deliveryTitle = String(item?.deliveryTitle || item?.title || "");
+      const validationMetrics = normalizeTextList(item?.validationMetrics || item?.validationMetric);
       return {
         label: String(item?.label || `方案 ${String.fromCharCode(65 + index)}`),
-        title: String(item?.title || ""),
+        title: deliveryTitle,
+        deliveryTitle,
+        coverPrompt: String(item?.coverPrompt || ""),
+        firstFiveSecondsOpening: String(item?.firstFiveSecondsOpening || item?.firstFiveSeconds || ""),
+        contentStructure: normalizeTextList(item?.contentStructure),
+        publishTime: String(item?.publishTime || ""),
         whatToDo: String(item?.whatToDo || ""),
         why: String(item?.why || ""),
         ...evidence,
-        validationMetric: String(item?.validationMetric || "")
+        validationMetric: validationMetrics.join("；"),
+        validationMetrics
       };
     })
   };
@@ -160,12 +173,13 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
           "你的职责是理解账号语境、提出解释性假设，并设计下一轮可验证实验。",
           "不要把相关性说成因果。证据不足时明确写“假设”。",
           "所有数据判断只能引用 evidenceCatalog 中存在的证据 ID，不得自行计算、估算、错配标题或补充平台不存在的指标。",
-          "必须返回 JSON，建议最多三条，每条必须包含做什么、为什么、evidenceIds 和验证指标。"
+          "必须返回 JSON，建议最多三条。",
+          "每条建议必须是可直接执行的内容实验方案，并格式化包含：交付标题、封面提示词、前5秒开头要求、内容结构、发布时间、验证指标、做什么、为什么和 evidenceIds。"
         ].join("\n")
       },
       {
         role: "user",
-        content: `根据以下 JSON 生成内容策略：${JSON.stringify(input)}\n返回 JSON，结构固定为：{"replicablePattern":{"title":"","explanation":"","evidenceIds":["证据ID"]},"priorityProblem":{"title":"","explanation":"","evidenceIds":["证据ID"]},"suggestions":[{"label":"方案 A","title":"","whatToDo":"","why":"","evidenceIds":["证据ID"],"validationMetric":""}]}。evidenceIds 只能从 evidenceCatalog.id 原样选择。`
+        content: `根据以下 JSON 生成内容策略：${JSON.stringify(input)}\n返回 JSON，结构固定为：{"replicablePattern":{"title":"","explanation":"","evidenceIds":["证据ID"]},"priorityProblem":{"title":"","explanation":"","evidenceIds":["证据ID"]},"suggestions":[{"label":"方案 A","deliveryTitle":"","coverPrompt":"","firstFiveSecondsOpening":"","contentStructure":["结构步骤1","结构步骤2"],"publishTime":"","validationMetrics":["指标1","指标2"],"whatToDo":"","why":"","evidenceIds":["证据ID"]}]}。evidenceIds 只能从 evidenceCatalog.id 原样选择；validationMetrics 必须写清本次实验要观察的具体指标和判断口径。`
       }
     ]
   });

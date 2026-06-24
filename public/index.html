@@ -48,6 +48,10 @@
               <span class="menu-icon">✦</span>
               下一条做什么
             </button>
+            <button class="menu-item" type="button" data-view="experiments">
+              <span class="menu-icon">▣</span>
+              内容实验室
+            </button>
           </div>
 
           <div class="sidebar-tip">
@@ -262,12 +266,26 @@
               <div class="strategy-section-head">
                 <div>
                   <h3>内容实验建议</h3>
-                  <p>每条建议必须说明做什么、为什么、依据和验证指标。</p>
+                  <p>每条建议会生成交付标题、封面提示词、前 5 秒、结构、发布时间和验证指标。</p>
                 </div>
               </div>
               <div id="strategyResult" class="strategy-result empty-analysis">尚未生成建议。</div>
             </section>
           </div>
+        </section>
+
+        <section class="content-card view-panel hidden" data-panel="experiments">
+          <div class="panel-head">
+            <div>
+              <h2>内容实验室</h2>
+              <p>把 AI 方案落成实验卡片，并在下一次导入数据后匹配验证。</p>
+            </div>
+            <div class="toolbar">
+              <button id="experimentImportBtn" class="button primary" type="button">导入新数据</button>
+            </div>
+          </div>
+
+          <div id="experimentLab" class="experiment-lab"></div>
         </section>
 
         <section class="content-card view-panel hidden" data-panel="notes">

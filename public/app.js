@@ -79,7 +79,8 @@ const VIEW_META = {
   funnel: ["数据看板 / 内容诊断", "分叉式内容诊断"],
   cover: ["数据看板 / 封面分析", "封面分析"],
   notes: ["数据看板 / 笔记横向对比", "笔记横向对比"],
-  strategy: ["数据看板 / 下一条做什么", "下一条做什么内容"]
+  strategy: ["数据看板 / 下一条做什么", "下一条做什么内容"],
+  experiments: ["数据看板 / 内容实验室", "内容实验室"]
 };
 
 function formatNumber(value) {
@@ -116,6 +117,24 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/'/g, "&#39;");
+}
+
+function listFromValue(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return String(value || "")
+    .split(/\n|；|;/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function compactListHtml(value) {
+  const items = listFromValue(value);
+  if (!items.length) return escapeHtml(String(value || "").trim() || "-");
+  return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
 
 function tagClass(label) {
@@ -969,15 +988,23 @@ function strategyResultHtml(result) {
     <section class="strategy-suggestions">
       <span class="strategy-eyebrow">下一条内容建议</span>
       <div class="suggestion-grid">
-        ${(result.suggestions || []).slice(0, 3).map((item) => `
+        ${(result.suggestions || []).slice(0, 3).map((item, index) => `
           <article class="suggestion-card">
-            <span class="suggestion-label">${escapeHtml(item.label)}</span>
-            <h4>${escapeHtml(item.title || "")}</h4>
+            <div class="suggestion-card-head">
+              <span class="suggestion-label">${escapeHtml(item.label)}</span>
+              <button class="button primary ai-table-button" type="button" data-start-experiment="${index}">开始实验</button>
+            </div>
+            <h4>${escapeHtml(item.deliveryTitle || item.title || "")}</h4>
             <dl>
+              <div><dt>交付标题</dt><dd>${escapeHtml(item.deliveryTitle || item.title || "-")}</dd></div>
+              <div><dt>封面提示词</dt><dd>${escapeHtml(item.coverPrompt || "-")}</dd></div>
+              <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(item.firstFiveSecondsOpening || "-")}</dd></div>
+              <div><dt>内容结构</dt><dd>${compactListHtml(item.contentStructure)}</dd></div>
+              <div><dt>发布时间</dt><dd>${escapeHtml(item.publishTime || "-")}</dd></div>
+              <div><dt>验证指标</dt><dd>${compactListHtml(item.validationMetrics || item.validationMetric)}</dd></div>
               <div><dt>建议做什么</dt><dd>${escapeHtml(item.whatToDo || "-")}</dd></div>
               <div><dt>为什么建议这样做</dt><dd>${escapeHtml(item.why || "-")}</dd></div>
               <div><dt>它基于哪些数据</dt><dd>${escapeHtml(item.dataBasis || "-")}</dd></div>
-              <div><dt>下一次用什么指标验证</dt><dd>${escapeHtml(item.validationMetric || "-")}</dd></div>
             </dl>
           </article>
         `).join("")}
@@ -995,7 +1022,7 @@ function renderStrategyPayload({ preserveInputs = false } = {}) {
   if (status) {
     status.textContent = payload?.ai?.configured
       ? `${payload.ai.visionModel} / ${payload.ai.strategyModel}`
-      : "百炼未配置";
+      : "AI模型未配置";
     status.classList.toggle("warning", !payload?.ai?.configured);
   }
   renderStrategyFacts(payload?.facts);
@@ -1043,7 +1070,7 @@ async function runCoverAnalysis(noteKey, button) {
     button.textContent = "分析中...";
   }
   const status = document.getElementById("strategyActionStatus");
-  if (status && noteKey === state.strategyNoteKey) status.textContent = "正在将封面交给百炼进行视觉解读...";
+  if (status && noteKey === state.strategyNoteKey) status.textContent = "正在将封面交给AI进行视觉解读...";
   try {
     const response = await fetch("/api/content-strategy/cover", {
       method: "POST",
@@ -1100,6 +1127,153 @@ async function generateStrategy() {
   } finally {
     button.disabled = false;
     button.textContent = "生成下一条建议";
+  }
+}
+
+function activeStrategyAnalysis() {
+  const note = selectedStrategyNote();
+  return state.strategyPayload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
+}
+
+function setView(view) {
+  state.view = VIEW_META[view] ? view : "lifecycle";
+  document.querySelectorAll(".menu-item").forEach((menu) => {
+    menu.classList.toggle("active", menu.dataset.view === state.view);
+  });
+  renderView();
+}
+
+async function startContentExperiment(index) {
+  const note = selectedStrategyNote();
+  const analysis = activeStrategyAnalysis();
+  const suggestion = analysis?.strategyAnalysis?.suggestions?.[index];
+  const status = document.getElementById("strategyActionStatus");
+  if (!note || !suggestion) {
+    if (status) status.textContent = "没有找到可启动的实验方案。";
+    return;
+  }
+  if (status) status.textContent = "正在创建实验卡片...";
+  try {
+    const response = await fetch("/api/content-experiments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceNoteKey: note.noteKey,
+        sourceTitle: note.title || "",
+        suggestion
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "创建实验失败");
+    state.data.contentExperiments ||= [];
+    state.data.contentExperiments = [
+      payload.experiment,
+      ...state.data.contentExperiments.filter((item) => item.id !== payload.experiment.id)
+    ];
+    renderExperimentLab();
+    setView("experiments");
+    if (status) status.textContent = "实验卡片已创建。";
+  } catch (error) {
+    if (status) status.textContent = `创建实验失败：${error.message}`;
+  }
+}
+
+function experimentCandidateOptions(selectedKey) {
+  return (state.data.notes || []).map((note) => `
+    <option value="${escapeAttr(note.noteKey)}" ${note.noteKey === selectedKey ? "selected" : ""}>
+      ${escapeHtml(shortTitle(note.title))} · ${escapeHtml(note.publishedAt || "未记录发布时间")}
+    </option>
+  `).join("");
+}
+
+function verificationHtml(snapshot) {
+  if (!snapshot) return '<div class="analysis-muted">等待导入数据后选择对应笔记。</div>';
+  const metrics = [
+    ["曝光", formatNumber(snapshot.impressions)],
+    ["观看", formatNumber(snapshot.views)],
+    ["官方封面点击率", formatOptionalPct(snapshot.officialCoverClickRate)],
+    ["观看曝光比", formatPct(snapshot.viewRate)],
+    ["互动率", formatPct(snapshot.interactionRate)],
+    ["收藏率", formatPct(snapshot.collectRate)],
+    ["评论率", formatPct(snapshot.commentRate)],
+    ["分享率", formatPct(snapshot.shareRate)],
+    ["转粉率", formatPct(snapshot.followRate)]
+  ];
+  return `
+    <div class="experiment-verified-note">${escapeHtml(snapshot.title || snapshot.noteKey)}</div>
+    <div class="experiment-metrics">
+      ${metrics.map(([label, value]) => `
+        <div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function experimentCardHtml(experiment) {
+  const isVerified = experiment.status === "verified" || Boolean(experiment.matchedNoteKey);
+  return `
+    <article class="experiment-card">
+      <div class="experiment-card-head">
+        <div>
+          <span class="experiment-status ${isVerified ? "verified" : ""}">${isVerified ? "已验证" : "待验证"}</span>
+          <h3>${escapeHtml(experiment.deliveryTitle || "未命名实验")}</h3>
+          <p>${escapeHtml(experiment.sourceTitle ? `来源：${experiment.sourceTitle}` : "来源：AI 内容建议")}</p>
+        </div>
+        <span class="analysis-meta">${experiment.createdAt ? new Date(experiment.createdAt).toLocaleString("zh-CN") : ""}</span>
+      </div>
+      <dl class="experiment-definition-list">
+        <div><dt>封面提示词</dt><dd>${escapeHtml(experiment.coverPrompt || "-")}</dd></div>
+        <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(experiment.firstFiveSecondsOpening || "-")}</dd></div>
+        <div><dt>内容结构</dt><dd>${compactListHtml(experiment.contentStructure)}</dd></div>
+        <div><dt>发布时间</dt><dd>${escapeHtml(experiment.publishTime || "-")}</dd></div>
+        <div><dt>验证指标</dt><dd>${compactListHtml(experiment.validationMetrics)}</dd></div>
+        <div><dt>数据依据</dt><dd>${escapeHtml(experiment.dataBasis || "-")}</dd></div>
+      </dl>
+      <div class="experiment-match-panel">
+        <div>
+          <label for="match-${escapeAttr(experiment.id)}">匹配导入后的笔记</label>
+          <select id="match-${escapeAttr(experiment.id)}" class="select-input wide-select" data-experiment-match-select="${escapeAttr(experiment.id)}">
+            <option value="">选择笔记</option>
+            ${experimentCandidateOptions(experiment.matchedNoteKey)}
+          </select>
+        </div>
+        <button class="button primary" type="button" data-match-experiment="${escapeAttr(experiment.id)}">完成验证</button>
+      </div>
+      <div class="experiment-verification">
+        ${verificationHtml(experiment.verificationSnapshot)}
+      </div>
+    </article>
+  `;
+}
+
+function renderExperimentLab() {
+  const container = document.getElementById("experimentLab");
+  if (!container || !state.data) return;
+  const experiments = state.data.contentExperiments || [];
+  container.innerHTML = experiments.length
+    ? experiments.map(experimentCardHtml).join("")
+    : '<div class="empty-analysis">还没有实验卡片。先在“下一条做什么”里生成建议并点击“开始实验”。</div>';
+}
+
+async function matchContentExperiment(experimentId) {
+  const select = [...document.querySelectorAll("[data-experiment-match-select]")]
+    .find((item) => item.dataset.experimentMatchSelect === experimentId);
+  const noteKey = select?.value || "";
+  if (!noteKey) return;
+  try {
+    const response = await fetch(`/api/content-experiments/${encodeURIComponent(experimentId)}/match`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteKey })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "匹配失败");
+    state.data.contentExperiments = (state.data.contentExperiments || []).map((item) => (
+      item.id === payload.experiment.id ? payload.experiment : item
+    ));
+    renderExperimentLab();
+  } catch (error) {
+    window.alert(`匹配失败：${error.message}`);
   }
 }
 
@@ -1927,7 +2101,7 @@ function renderView() {
     setTimeout(() => state.funnelChart && state.funnelChart.resize(), 0);
   } else if (state.view === "cover") {
     setTimeout(() => state.coverChart && state.coverChart.resize(), 0);
-  } else {
+  } else if (state.view === "lifecycle") {
     setTimeout(() => state.chart && state.chart.resize(), 0);
   }
 }
@@ -1942,6 +2116,7 @@ function render() {
   renderCoverAnalysis();
   renderNotesCompare();
   renderStrategyAnalysis();
+  renderExperimentLab();
   renderView();
 }
 
@@ -1954,19 +2129,27 @@ async function loadData() {
 }
 
 async function refreshImport() {
-  const button = document.getElementById("refreshBtn");
-  button.disabled = true;
-  button.textContent = "导入中...";
-  const response = await fetch("/api/import", { method: "POST" });
-  state.data = await response.json();
-  state.reviewDraft = null;
-  state.benchmarkCache = new Map();
-  button.disabled = false;
-  button.textContent = "重新导入";
-  render();
+  const buttons = [document.getElementById("refreshBtn"), document.getElementById("experimentImportBtn")].filter(Boolean);
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.textContent = "导入中...";
+  });
+  try {
+    const response = await fetch("/api/import", { method: "POST" });
+    state.data = await response.json();
+    state.reviewDraft = null;
+    state.benchmarkCache = new Map();
+    render();
+  } finally {
+    buttons.forEach((button) => {
+      button.disabled = false;
+      button.textContent = button.id === "refreshBtn" ? "重新导入" : "导入新数据";
+    });
+  }
 }
 
 document.getElementById("refreshBtn").addEventListener("click", refreshImport);
+document.getElementById("experimentImportBtn").addEventListener("click", refreshImport);
 document.getElementById("chartMetricSelect").addEventListener("change", (event) => {
   state.chartMetric = event.target.value;
   renderLifecycleChart();
@@ -2134,6 +2317,18 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const startExperimentButton = event.target.closest("[data-start-experiment]");
+  if (startExperimentButton) {
+    startContentExperiment(Number(startExperimentButton.dataset.startExperiment));
+    return;
+  }
+
+  const matchExperimentButton = event.target.closest("[data-match-experiment]");
+  if (matchExperimentButton) {
+    matchContentExperiment(matchExperimentButton.dataset.matchExperiment);
+    return;
+  }
+
   const header = event.target.closest("th[data-table][data-sort-key]");
   if (header) {
     setTableSort(header.dataset.table, header.dataset.sortKey);
@@ -2166,10 +2361,7 @@ document.addEventListener("change", (event) => {
 
 document.querySelectorAll(".menu-item").forEach((item) => {
   item.addEventListener("click", () => {
-    document.querySelectorAll(".menu-item").forEach((menu) => menu.classList.remove("active"));
-    item.classList.add("active");
-    state.view = VIEW_META[item.dataset.view] ? item.dataset.view : "lifecycle";
-    renderView();
+    setView(item.dataset.view);
   });
 });
 

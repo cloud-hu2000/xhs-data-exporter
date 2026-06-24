@@ -42,6 +42,7 @@ flowchart LR
   J --> L["src/dashboard-server.js"]
   M["data/note-reviews.json"] --> L
   N["data/ai-content-analysis.json"] --> L
+  X["data/content-experiments.json"] --> L
   L --> O["/api/*"]
   O --> P["public/app.js + ECharts"]
   L --> Q["src/bailian-client.js"]
@@ -51,7 +52,7 @@ flowchart LR
 关键边界：
 
 - `downloads/` 是原始输入；`data/xhs-unified-data.json` 是仪表盘的主数据源。
-- 人工复盘和 AI 分析分别独立保存在 `note-reviews.json`、`ai-content-analysis.json`，重新导入原始数据不会覆盖它们。
+- 人工复盘、AI 分析和内容实验卡片分别独立保存在 `note-reviews.json`、`ai-content-analysis.json`、`content-experiments.json`，重新导入原始数据不会覆盖它们。
 - 前端不直接读磁盘，只通过 `src/dashboard-server.js` 暴露的 API 获取和保存数据。
 - `data/`、`downloads/`、`logs/`、浏览器 Profile 均为运行时产物，不纳入 Git。
 
@@ -85,12 +86,14 @@ xhs-data-exporter/
 │  ├─ profile-transcript.js                 # Profile 中文字幕关联与 SRT 清洗
 │  ├─ bailian-client.js                    # 百炼请求、模型输出校验
 │  ├─ ai-analysis-store.js                 # AI 分析结果存储
+│  ├─ content-experiment-store.js          # 内容实验卡片与验证匹配存储
 │  └─ dashboard-server.js                  # Express API 与静态站点
 ├─ test/
 │  ├─ metric-field-mapping.test.js
 │  ├─ content-diagnostics.test.js
 │  ├─ content-strategy.test.js
-│  └─ note-review-store.test.js
+│  ├─ note-review-store.test.js
+│  └─ content-experiment-store.test.js
 ├─ data/                                   # 运行时统一数据、复盘、AI 结果、截图
 ├─ downloads/                              # 小红书原始导出文件
 ├─ logs/                                   # 导出和仪表盘日志
@@ -113,7 +116,7 @@ xhs-data-exporter/
 | `npm run import` | `import-xhs-data.js` | 仅重建统一数据 |
 | `npm run dashboard` | `dashboard-server.js` | 启动本地仪表盘 |
 | `npm run inspect` | `inspect-page.js` | 检查页面可点击元素 |
-| `npm test` | `test/*.test.js` | 顺序执行 4 组单元测试 |
+| `npm test` | `test/*.test.js` | 顺序执行单元测试 |
 
 注意：`run.bat export` 与 `npm run export` 不完全相同。前者由 CLI 编排，导出成功后还会执行导入；后者只运行 `export-xhs.js`。
 
@@ -190,12 +193,14 @@ xhs-data-exporter/
 - `src/dashboard-server.js`
   - 默认监听 `5178`，可用 `XHS_DASHBOARD_PORT` 修改。
   - 若主数据不存在，`GET /api/data` 会触发一次导入；主数据存在时直接读取，不自动扫描新下载文件。
-  - 将统一数据与人工复盘、AI 分析结果组合后返回前端。
+  - 将统一数据与人工复盘、AI 分析结果、内容实验卡片组合后返回前端。
 - `src/note-review-store.js`
   - 以 `noteKey` 保存人工标签、系列、前 5 秒结构和备注。
   - 自定义选项会被持久化，并与默认选项合并。
 - `src/ai-analysis-store.js`
   - 以 `noteKey` 合并保存封面分析、输入文本和策略结果。
+- `src/content-experiment-store.js`
+  - 保存从 AI 建议启动的内容实验卡片，并在导入新数据后按人工选择的 `noteKey` 记录验证快照。
 - `src/content-strategy.js`
   - 计算目标笔记在账号内部的 Q1、中位数、Q3、分位排名。
   - 生成可引用的 evidence ID，限制模型只能使用已计算事实。
@@ -214,12 +219,15 @@ xhs-data-exporter/
 | 方法与路径 | 作用 | 主要读写 |
 |---|---|---|
 | `GET /health` | 服务和 AI 配置状态 | 环境变量 |
-| `GET /api/data` | 获取装饰后的完整数据 | unified data + reviews + AI |
+| `GET /api/data` | 获取装饰后的完整数据 | unified data + reviews + AI + experiments |
 | `POST /api/import` | 重新扫描下载目录并导入 | 写 unified data/CSV |
 | `POST /api/note-reviews` | 保存某篇笔记的人工复盘 | 写 `note-reviews.json` |
 | `GET /api/content-strategy/:noteKey` | 获取规则事实、自动中文字幕、缓存分析和模型状态 | 读主数据、Profile 字幕与 AI 缓存 |
 | `POST /api/content-strategy/cover` | 调用视觉模型分析封面 | 写 AI 分析 |
 | `POST /api/content-strategy/recommend` | 调用文本模型生成下一条建议 | 写 AI 分析 |
+| `GET /api/content-experiments` | 获取内容实验卡片 | 读 `content-experiments.json` |
+| `POST /api/content-experiments` | 从 AI 建议创建实验卡片 | 写 `content-experiments.json` |
+| `PATCH /api/content-experiments/:experimentId/match` | 将导入后的笔记匹配到实验卡片并记录验证快照 | 写 `content-experiments.json` |
 
 静态资源：
 
@@ -229,13 +237,13 @@ xhs-data-exporter/
 ## 7. 前端结构
 
 - `public/index.html`
-  - 六个视图：生命周期、发布时间、内容漏斗、封面、笔记横向对比、内容策略。
+  - 七个视图：生命周期、发布时间、内容漏斗、封面、笔记横向对比、内容策略、内容实验室。
   - 无框架，依靠固定 DOM ID 和 `data-*` 属性连接 `app.js`。
 - `public/app.js`
   - 单一全局 `state` 保存数据、筛选、分页、排序、当前视图和 ECharts 实例。
   - `loadData()` 调用 `/api/data`；“导入新数据”调用 `/api/import`。
   - 所有视图采用命令式 DOM 渲染。
-  - 人工复盘、封面 AI、策略 AI 都在此发起 API 请求。
+  - 人工复盘、封面 AI、策略 AI、内容实验创建和实验匹配都在此发起 API 请求。
 - `public/content-diagnostics.js`
   - UMD 风格，同时暴露给浏览器 `window.ContentDiagnostics` 和 Node 测试。
   - 优先按同系列、同内容类型+形式、同类型、最近 30 篇选择对标样本。
@@ -265,6 +273,7 @@ skippedFiles         未识别、旧重复或错误导出文件
 reviewMetadata       人工复盘选项、更新时间、复盘数量
 notes[].review       对应 noteKey 的人工复盘
 aiAnalysis           以 noteKey 为键的 AI 分析
+contentExperiments   AI 方案启动的实验卡片、匹配笔记和验证快照
 ```
 
 主关联键是 `noteKey`，目前主要由清洗后的小写标题生成。标题变化、重名或导出文件名异常会影响封面、复盘和 AI 结果的关联。
@@ -319,6 +328,7 @@ Profile 导出使用：
 | 图表或表格错误 | `public/app.js` | `/api/data` 响应、浏览器控制台、DOM ID |
 | 相对诊断不出现 | `content-diagnostics.js` | peer 是否达到 3 篇、复盘标签是否可分组 |
 | AI 按钮不可用/报错 | `dashboard-server.js`、`bailian-client.js` | `.env`、`/health`、模型名、API 响应 |
+| 内容实验卡片或匹配失败 | `content-experiment-store.js`、`/api/content-experiments*` | `noteKey`、`data/content-experiments.json` 写权限、导入后笔记是否存在 |
 | 仪表盘无法启动 | `dashboard-server.js` | 5178 端口、`logs/dashboard.log`、依赖 |
 
 ## 11. 建议排障顺序
@@ -343,6 +353,7 @@ Profile 导出使用：
 - `content-diagnostics.test.js`：分位统计、对标组选择、规则诊断。
 - `content-strategy.test.js`：账号内事实分位和 evidence catalog。
 - `note-review-store.test.js`：复盘保存、自定义选项、重新装饰数据。
+- `content-experiment-store.test.js`：实验卡片创建、字段清洗、匹配验证快照。
 - `playwright-utils.test.js`：超长导出文件名保留固定后缀和扩展名。
 - `profile-transcript.test.js`：SRT 时间轴清洗、标题关联和中文字幕优先读取。
 
