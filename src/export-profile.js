@@ -1,8 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright-core");
+const { installConsoleLogger } = require("./console-logger");
 const { loadConfig, projectRoot } = require("./config");
 const { safeFilename, sleep } = require("./playwright-utils");
+
+installConsoleLogger();
 
 const profileUrl =
   process.env.XHS_PROFILE_URL ||

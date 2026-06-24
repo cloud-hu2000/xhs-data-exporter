@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const XLSX = require("xlsx");
+const { installConsoleLogger } = require("./console-logger");
 const { definitionsForClient, resolveMetricField } = require("./metric-field-mapping");
 
 const projectRoot = path.resolve(__dirname, "..");
@@ -612,6 +613,7 @@ function buildLifecycleMilestones(notes, dailyMetrics, hourlyMetrics) {
 }
 
 if (require.main === module) {
+  installConsoleLogger();
   importData();
 }
 

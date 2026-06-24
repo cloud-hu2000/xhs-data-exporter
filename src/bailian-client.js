@@ -169,7 +169,12 @@ function normalizeTextList(value) {
 }
 
 function normalizeTextBlock(value) {
-  if (Array.isArray(value)) return normalizeTextList(value).join("；");
+  if (Array.isArray(value)) return normalizeTextList(value).join("\uFF1B");
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, entry]) => `${key}: ${typeof entry === "string" ? entry : JSON.stringify(entry)}`)
+      .join("\uFF1B");
+  }
   return String(value || "").trim();
 }
 
@@ -203,6 +208,159 @@ const LEGACY_SUGGESTION_FIELDS = [
   "evidence"
 ];
 
+const READABLE_METRIC_LABELS = {
+  impressions: "曝光",
+  views: "观看",
+  viewRate: "观看曝光比",
+  officialCoverClickRate: "封面点击率",
+  coverClickRatePct: "封面点击率",
+  twoSecondExitRate: "2秒退出率",
+  twoSecondExitRatePct: "2秒退出率",
+  completionRate: "完播率",
+  completionRatePct: "完播率",
+  avgWatchSeconds: "平均观看时长",
+  likes: "点赞数",
+  likeRate: "点赞率",
+  collects: "收藏数",
+  collectRate: "收藏率",
+  comments: "评论数",
+  commentRate: "评论率",
+  shares: "分享数",
+  shareRate: "分享率",
+  followersGained: "新增粉丝数",
+  followRate: "转粉率"
+};
+
+const READABLE_FIELD_REFERENCES = {
+  "coverAnalysis.summary": "封面总结",
+  "coverAnalysis.visualElements": "封面视觉元素",
+  "coverAnalysis.textAndPromise": "封面文字承诺",
+  "coverAnalysis.strengths": "封面优势",
+  "coverAnalysis.risks": "封面风险",
+  "coverAnalysis.hypotheses": "封面假设",
+  "coverAnalysis.suggestedTests": "封面测试建议",
+  "selectedNote.caption": "笔记正文",
+  "selectedNote.transcript": "视频转写",
+  "selectedNote.review": "人工复盘",
+  "ruleFacts.facts": "规则事实",
+  "accountContext": "账号上下文"
+};
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function readableNoteTitle(title) {
+  const source = String(title || "").trim() || "未命名笔记";
+  return source.length > 10 ? `${source.slice(0, 10)}....` : source;
+}
+
+function buildReadableNoteTitles(evidenceCatalog) {
+  const titles = new Map();
+  for (const item of evidenceCatalog || []) {
+    const match = String(item?.id || "").match(/^note-(\d+)\./);
+    if (match && !titles.has(match[1])) {
+      titles.set(match[1], readableNoteTitle(item.title));
+    }
+  }
+  return titles;
+}
+
+function buildReadableEvidenceReferences(evidenceCatalog) {
+  const references = new Map();
+  for (const item of evidenceCatalog || []) {
+    const id = String(item?.id || "");
+    const match = id.match(/^note-(\d+)\.([A-Za-z][A-Za-z0-9_]*)$/);
+    if (!match) continue;
+    const [, noteIndex, metric] = match;
+    const title = readableNoteTitle(item.title || `第${Number(noteIndex) + 1}篇笔记`);
+    references.set(id, `${bracket(title)}的${bracket(readableMetricLabel(metric))}`);
+  }
+  return references;
+}
+
+function readableMetricLabel(metric) {
+  return READABLE_METRIC_LABELS[metric] || metric;
+}
+
+function bracket(value) {
+  return `【${value}】`;
+}
+
+function replaceEvidenceReferences(value, readableContext) {
+  let output = String(value || "");
+  for (const [id, label] of [...readableContext.evidenceReferences.entries()].sort((a, b) => b[0].length - a[0].length)) {
+    output = output.replace(new RegExp(`【?${escapeRegExp(id)}】?`, "g"), label);
+  }
+  output = output.replace(/【?\bnote-(\d+)\.([A-Za-z][A-Za-z0-9_]*)\b】?/g, (match, noteIndex, metric) => {
+    const title = readableContext.noteTitles.get(noteIndex) || `第${Number(noteIndex) + 1}篇笔记`;
+    return `${bracket(title)}的${bracket(readableMetricLabel(metric))}`;
+  });
+  output = output.replace(/【?\bnote-(\d+)\b】?/g, (match, noteIndex) => {
+    const title = readableContext.noteTitles.get(noteIndex) || `第${Number(noteIndex) + 1}篇笔记`;
+    return bracket(title);
+  });
+  return output;
+}
+
+function replaceFieldReferences(value) {
+  let output = String(value || "");
+  for (const [key, label] of Object.entries(READABLE_FIELD_REFERENCES)) {
+    output = output.replace(new RegExp(`【?${escapeRegExp(key)}】?`, "g"), bracket(label));
+  }
+  return output;
+}
+
+function replaceMetricReferences(value) {
+  let output = String(value || "");
+  for (const [key, label] of Object.entries(READABLE_METRIC_LABELS)) {
+    output = output.replace(new RegExp(`【${escapeRegExp(key)}】`, "g"), bracket(label));
+    output = output.replace(new RegExp(`\\[${escapeRegExp(key)}\\]`, "g"), bracket(label));
+    output = output.replace(
+      new RegExp(`(^|[^A-Za-z0-9_【])${escapeRegExp(key)}(?![A-Za-z0-9_】])`, "g"),
+      `$1${bracket(label)}`
+    );
+  }
+  return output;
+}
+
+function humanizeRecommendationText(value, readableContext) {
+  const withReadableNotes = replaceEvidenceReferences(value, readableContext);
+  const withReadableFields = replaceFieldReferences(withReadableNotes);
+  return replaceMetricReferences(withReadableFields);
+}
+
+function readableContextFromEvidence(evidenceCatalog) {
+  return {
+    noteTitles: buildReadableNoteTitles(evidenceCatalog),
+    evidenceReferences: buildReadableEvidenceReferences(evidenceCatalog)
+  };
+}
+
+function humanizeStrategyValue(value, readableContext, key = "") {
+  if (typeof value === "string") {
+    return key === "evidenceIds" ? value : humanizeRecommendationText(value, readableContext);
+  }
+  if (Array.isArray(value)) {
+    return key === "evidenceIds"
+      ? value.slice()
+      : value.map((item) => humanizeStrategyValue(item, readableContext, key));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        humanizeStrategyValue(entryValue, readableContext, entryKey)
+      ])
+    );
+  }
+  return value;
+}
+
+function humanizeStrategyResult(result, evidenceCatalog) {
+  return humanizeStrategyValue(result, readableContextFromEvidence(evidenceCatalog));
+}
+
 function hasNewSuggestionShape(item) {
   return Boolean(item && SUGGESTION_FIELDS.some((key) => item[key] != null));
 }
@@ -212,22 +370,23 @@ function legacySuggestionKeys(item) {
   return LEGACY_SUGGESTION_FIELDS.filter((key) => item[key] != null);
 }
 
-function normalizeSuggestion(item) {
+function normalizeSuggestion(item, readableContext) {
   return {
-    delivery_title: String(item?.delivery_title || "").trim(),
-    cover_prompt: String(item?.cover_prompt || "").trim(),
-    opening_hook: String(item?.opening_hook || "").trim(),
-    content_structure: normalizeTextBlock(item?.content_structure),
-    publish_time: String(item?.publish_time || "").trim(),
-    success_metrics: normalizeTextBlock(item?.success_metrics),
-    recommended_actions: normalizeTextBlock(item?.recommended_actions),
-    rationale: String(item?.rationale || "").trim(),
-    data_basis: String(item?.data_basis || "").trim()
+    delivery_title: humanizeRecommendationText(String(item?.delivery_title || "").trim(), readableContext),
+    cover_prompt: humanizeRecommendationText(String(item?.cover_prompt || "").trim(), readableContext),
+    opening_hook: humanizeRecommendationText(String(item?.opening_hook || "").trim(), readableContext),
+    content_structure: humanizeRecommendationText(normalizeTextBlock(item?.content_structure), readableContext),
+    publish_time: humanizeRecommendationText(String(item?.publish_time || "").trim(), readableContext),
+    success_metrics: humanizeRecommendationText(normalizeTextBlock(item?.success_metrics), readableContext),
+    recommended_actions: humanizeRecommendationText(normalizeTextBlock(item?.recommended_actions), readableContext),
+    rationale: humanizeRecommendationText(String(item?.rationale || "").trim(), readableContext),
+    data_basis: humanizeRecommendationText(String(item?.data_basis || "").trim(), readableContext)
   };
 }
 
 function validateRecommendation(result, evidenceCatalog) {
   const evidenceById = new Map(evidenceCatalog.map((item) => [item.id, item]));
+  const readableContext = readableContextFromEvidence(evidenceCatalog);
   const rawSuggestions = Array.isArray(result?.suggestions)
     ? result.suggestions
     : hasNewSuggestionShape(result)
@@ -240,18 +399,18 @@ function validateRecommendation(result, evidenceCatalog) {
   if (rawSuggestions.some((item) => !hasNewSuggestionShape(item))) {
     throw new Error("模型未按新版 suggestions 字段返回内容实验方案");
   }
-  const suggestions = rawSuggestions.slice(0, 3).map(normalizeSuggestion);
+  const suggestions = rawSuggestions.slice(0, 3).map((item) => normalizeSuggestion(item, readableContext));
   const patternEvidence = evidenceText(result?.replicablePattern?.evidenceIds, evidenceById);
   const problemEvidence = evidenceText(result?.priorityProblem?.evidenceIds, evidenceById);
   return {
     replicablePattern: {
-      title: String(result?.replicablePattern?.title || ""),
-      explanation: String(result?.replicablePattern?.explanation || ""),
+      title: humanizeRecommendationText(String(result?.replicablePattern?.title || ""), readableContext),
+      explanation: humanizeRecommendationText(String(result?.replicablePattern?.explanation || ""), readableContext),
       ...patternEvidence
     },
     priorityProblem: {
-      title: String(result?.priorityProblem?.title || ""),
-      explanation: String(result?.priorityProblem?.explanation || ""),
+      title: humanizeRecommendationText(String(result?.priorityProblem?.title || ""), readableContext),
+      explanation: humanizeRecommendationText(String(result?.priorityProblem?.explanation || ""), readableContext),
       ...problemEvidence
     },
     suggestions
@@ -318,8 +477,9 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
       }
     ]
   });
+  const humanizedResult = humanizeStrategyResult(result, evidenceCatalog);
   const analysis = {
-    ...validateRecommendation(result, evidenceCatalog),
+    ...validateRecommendation(humanizedResult, evidenceCatalog),
     model: settings.strategyModel,
     analyzedAt: new Date().toISOString()
   };
@@ -327,6 +487,7 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
     noteKey: note.noteKey,
     model: settings.strategyModel,
     rawResult: result,
+    humanizedResult,
     analysis
   });
   return analysis;
@@ -337,5 +498,6 @@ module.exports = {
   analyzeStrategy,
   config,
   extractJson,
+  humanizeStrategyResult,
   validateRecommendation
 };

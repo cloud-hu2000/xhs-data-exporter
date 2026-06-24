@@ -3,6 +3,9 @@ const http = require("http");
 const path = require("path");
 const readline = require("readline");
 const { spawn, spawnSync } = require("child_process");
+const { installConsoleLogger } = require("./console-logger");
+
+installConsoleLogger();
 
 const projectRoot = path.resolve(__dirname, "..");
 const logsDir = path.join(projectRoot, "logs");

@@ -1,5 +1,8 @@
 const { chromium } = require("playwright-core");
+const { installConsoleLogger } = require("./console-logger");
 const { loadConfig } = require("./config");
+
+installConsoleLogger();
 
 async function main() {
   const config = loadConfig();

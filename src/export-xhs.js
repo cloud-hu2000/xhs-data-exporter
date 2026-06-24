@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright-core");
+const { installConsoleLogger } = require("./console-logger");
 const { loadConfig } = require("./config");
 const {
   sleep,
@@ -12,6 +13,8 @@ const {
   newFilesSince,
   safeFilename
 } = require("./playwright-utils");
+
+installConsoleLogger();
 
 const projectRoot = path.resolve(__dirname, "..");
 const dataDir = path.join(projectRoot, "data");

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const { installConsoleLogger } = require("./console-logger");
 const { loadEnv } = require("./env");
 const { importData, dataDir } = require("./import-xhs-data");
 const { createNoteReviewStore } = require("./note-review-store");
@@ -9,6 +10,8 @@ const { createContentExperimentStore } = require("./content-experiment-store");
 const { createProfileTranscriptReader } = require("./profile-transcript");
 const { buildEvidenceCatalog, buildFactDiagnostics, compactAccountContext } = require("./content-strategy");
 const Bailian = require("./bailian-client");
+
+installConsoleLogger();
 
 loadEnv();
 const projectRoot = path.resolve(__dirname, "..");
@@ -30,12 +33,31 @@ function readData() {
   return JSON.parse(fs.readFileSync(dataPath, "utf8"));
 }
 
-function readDecoratedData() {
+function readableAiAnalysis(database) {
+  const evidenceCatalog = buildEvidenceCatalog(database.notes || []);
+  return Object.fromEntries(
+    Object.entries(aiAnalysisStore.list()).map(([noteKey, record]) => [
+      noteKey,
+      record?.strategyAnalysis
+        ? {
+            ...record,
+            strategyAnalysis: Bailian.humanizeStrategyResult(record.strategyAnalysis, evidenceCatalog)
+          }
+        : record
+    ])
+  );
+}
+
+function decorateRuntimeData(database) {
   return {
-    ...noteReviewStore.decorateDatabase(readData()),
-    aiAnalysis: aiAnalysisStore.list(),
+    ...database,
+    aiAnalysis: readableAiAnalysis(database),
     contentExperiments: contentExperimentStore.list()
   };
+}
+
+function readDecoratedData() {
+  return decorateRuntimeData(noteReviewStore.decorateDatabase(readData()));
 }
 
 function analysisContext(noteKey) {
@@ -60,11 +82,7 @@ app.get("/api/data", (req, res) => {
 });
 
 app.post("/api/import", (req, res) => {
-  res.json({
-    ...noteReviewStore.decorateDatabase(importData()),
-    aiAnalysis: aiAnalysisStore.list(),
-    contentExperiments: contentExperimentStore.list()
-  });
+  res.json(decorateRuntimeData(noteReviewStore.decorateDatabase(importData())));
 });
 
 app.post("/api/note-reviews", (req, res) => {

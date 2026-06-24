@@ -4,6 +4,7 @@ const path = require("path");
 const projectRoot = path.resolve(__dirname, "..");
 
 const defaults = {
+  debug: false,
   debugPort: 9222,
   targetUrl: "https://creator.xiaohongshu.com/statistics/data-analysis",
   downloadDir: "./downloads",
@@ -30,6 +31,9 @@ function loadConfig() {
     : {};
   const config = { ...defaults, ...userConfig };
 
+  if (process.env.XHS_DEBUG) {
+    config.debug = ["1", "true", "yes", "on"].includes(process.env.XHS_DEBUG.toLowerCase());
+  }
   if (process.env.XHS_DEBUG_PORT) {
     config.debugPort = Number(process.env.XHS_DEBUG_PORT);
   }

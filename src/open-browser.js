@@ -1,8 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { installConsoleLogger } = require("./console-logger");
 const { loadConfig, projectRoot } = require("./config");
 const { findBrowserExecutable } = require("./browser-path");
+
+installConsoleLogger();
 
 const config = loadConfig();
 const browserPath = findBrowserExecutable();

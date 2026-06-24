@@ -1,4 +1,5 @@
 {
+  "debug": true,
   "debugPort": 9333,
   "targetUrl": "https://creator.xiaohongshu.com/statistics/data-analysis",
   "downloadDir": "./downloads",
