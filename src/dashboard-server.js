@@ -145,17 +145,23 @@ app.post("/api/content-strategy/recommend", async (req, res) => {
     const context = analysisContext(req.body?.noteKey);
     const caption = String(req.body?.caption || "").trim();
     const transcript = String(req.body?.transcript || "").trim();
+    const coverAnalysis = await Bailian.analyzeCover(context.note, context.facts);
+    aiAnalysisStore.merge(context.note.noteKey, {
+      title: context.note.title || "",
+      coverAnalysis
+    });
     const strategyAnalysis = await Bailian.analyzeStrategy({
       note: context.note,
       facts: context.facts,
       accountContext: compactAccountContext(context.database.notes),
       evidenceCatalog: buildEvidenceCatalog(context.database.notes),
-      coverAnalysis: context.cached?.coverAnalysis || null,
+      coverAnalysis,
       caption,
       transcript
     });
     const saved = aiAnalysisStore.merge(context.note.noteKey, {
       title: context.note.title || "",
+      coverAnalysis,
       inputs: { caption, transcript },
       strategyAnalysis
     });

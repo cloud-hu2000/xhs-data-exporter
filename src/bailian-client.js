@@ -450,8 +450,7 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
           "所有数据判断只能引用 evidenceCatalog 中存在的事实，不得自行计算、估算、错配标题或补充平台不存在的指标。",
           "必须返回 JSON，建议最多三条。",
           "每条 suggestions 建议必须是可直接执行的内容实验方案，并且只使用固定 snake_case 字段：delivery_title、cover_prompt、opening_hook、content_structure、publish_time、success_metrics、recommended_actions、rationale、data_basis。",
-          "禁止在 suggestions 里输出 title、whatToDo、why、validationMetric、evidenceIds、evidence、label 或其他字段。",
-          "data_basis 必须写清引用了哪些 evidenceCatalog 事实。"
+          "禁止在 suggestions 里输出 title、whatToDo、why、validationMetric、evidenceIds、evidence、label 或其他字段。"
         ].join("\n")
       },
       {
@@ -472,7 +471,7 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
             rationale: "string // 为什么建议这样做的原因说明",
             data_basis: "string // 决策所基于的数据来源或关键数据点"
           }),
-          "content_structure 必须是字符串，例如“问题-方案-案例-总结”。success_metrics 必须写清具体指标和判断口径。data_basis 只能引用 evidenceCatalog 中已给出的事实。"
+          "content_structure 必须是字符串，例如“问题-方案-案例-总结”。success_metrics 必须写清具体指标和判断口径。"
         ].join("\n")
       }
     ]

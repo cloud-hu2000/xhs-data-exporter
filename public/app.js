@@ -13,6 +13,7 @@ const state = {
   notesCompareTag: "all",
   strategyNoteKey: "",
   strategyPayload: null,
+  expandedExperiments: new Set(),
   coverAiNoteKey: "",
   reviewNoteKey: "",
   reviewDraft: null,
@@ -1104,12 +1105,13 @@ async function generateStrategy() {
   const status = document.getElementById("strategyActionStatus");
   const noteKey = state.strategyNoteKey;
   button.disabled = true;
-  button.textContent = "分析中...";
-  status.textContent = "正在结合账号数据、封面解读和内容语境设计下一轮实验...";
+  button.textContent = "生成中...";
+  status.textContent = "正在先分析封面，再结合账号数据和内容语境设计下一轮实验...";
   state.strategyPayload = {
     ...(state.strategyPayload || {}),
     analysis: {
       ...(state.strategyPayload?.analysis || {}),
+      coverAnalysis: null,
       strategyAnalysis: null
     }
   };
@@ -1221,36 +1223,45 @@ function verificationHtml(snapshot) {
 
 function experimentCardHtml(experiment) {
   const isVerified = experiment.status === "verified" || Boolean(experiment.matchedNoteKey);
+  const isExpanded = state.expandedExperiments.has(experiment.id);
+  const title = experiment.delivery_title || "未命名实验";
+  const source = experiment.sourceTitle ? `来源：${experiment.sourceTitle}` : "来源：AI 内容建议";
+  const createdAt = experiment.createdAt ? new Date(experiment.createdAt).toLocaleString("zh-CN") : "";
   return `
-    <article class="experiment-card">
-      <div class="experiment-card-head">
-        <div>
+    <article class="experiment-card ${isExpanded ? "is-expanded" : ""}">
+      <button class="experiment-card-summary" type="button" data-toggle-experiment="${escapeAttr(experiment.id)}" aria-expanded="${isExpanded ? "true" : "false"}">
+        <span class="experiment-summary-main">
           <span class="experiment-status ${isVerified ? "verified" : ""}">${isVerified ? "已验证" : "待验证"}</span>
-          <h3>${escapeHtml(experiment.delivery_title || "未命名实验")}</h3>
-          <p>${escapeHtml(experiment.sourceTitle ? `来源：${experiment.sourceTitle}` : "来源：AI 内容建议")}</p>
+          <span class="experiment-summary-title">${escapeHtml(title)}</span>
+        </span>
+        <span class="experiment-summary-meta">
+          <span>${escapeHtml(source)}</span>
+          <span class="analysis-meta">${escapeHtml(createdAt)}</span>
+          <span class="experiment-summary-icon" aria-hidden="true">›</span>
+        </span>
+      </button>
+      <div class="experiment-card-detail">
+        <dl class="experiment-definition-list">
+          <div><dt>封面提示词</dt><dd>${escapeHtml(experiment.cover_prompt || "-")}</dd></div>
+          <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(experiment.opening_hook || "-")}</dd></div>
+          <div><dt>内容结构</dt><dd>${compactListHtml(experiment.content_structure)}</dd></div>
+          <div><dt>发布时间</dt><dd>${escapeHtml(experiment.publish_time || "-")}</dd></div>
+          <div><dt>验证指标</dt><dd>${compactListHtml(experiment.success_metrics)}</dd></div>
+          <div><dt>数据依据</dt><dd>${escapeHtml(experiment.data_basis || "-")}</dd></div>
+        </dl>
+        <div class="experiment-match-panel">
+          <div>
+            <label for="match-${escapeAttr(experiment.id)}">匹配导入后的笔记</label>
+            <select id="match-${escapeAttr(experiment.id)}" class="select-input wide-select" data-experiment-match-select="${escapeAttr(experiment.id)}">
+              <option value="">选择笔记</option>
+              ${experimentCandidateOptions(experiment.matchedNoteKey)}
+            </select>
+          </div>
+          <button class="button primary" type="button" data-match-experiment="${escapeAttr(experiment.id)}">完成验证</button>
         </div>
-        <span class="analysis-meta">${experiment.createdAt ? new Date(experiment.createdAt).toLocaleString("zh-CN") : ""}</span>
-      </div>
-      <dl class="experiment-definition-list">
-        <div><dt>封面提示词</dt><dd>${escapeHtml(experiment.cover_prompt || "-")}</dd></div>
-        <div><dt>前 5 秒开头要求</dt><dd>${escapeHtml(experiment.opening_hook || "-")}</dd></div>
-        <div><dt>内容结构</dt><dd>${compactListHtml(experiment.content_structure)}</dd></div>
-        <div><dt>发布时间</dt><dd>${escapeHtml(experiment.publish_time || "-")}</dd></div>
-        <div><dt>验证指标</dt><dd>${compactListHtml(experiment.success_metrics)}</dd></div>
-        <div><dt>数据依据</dt><dd>${escapeHtml(experiment.data_basis || "-")}</dd></div>
-      </dl>
-      <div class="experiment-match-panel">
-        <div>
-          <label for="match-${escapeAttr(experiment.id)}">匹配导入后的笔记</label>
-          <select id="match-${escapeAttr(experiment.id)}" class="select-input wide-select" data-experiment-match-select="${escapeAttr(experiment.id)}">
-            <option value="">选择笔记</option>
-            ${experimentCandidateOptions(experiment.matchedNoteKey)}
-          </select>
+        <div class="experiment-verification">
+          ${verificationHtml(experiment.verificationSnapshot)}
         </div>
-        <button class="button primary" type="button" data-match-experiment="${escapeAttr(experiment.id)}">完成验证</button>
-      </div>
-      <div class="experiment-verification">
-        ${verificationHtml(experiment.verificationSnapshot)}
       </div>
     </article>
   `;
@@ -1293,7 +1304,7 @@ function renderSummary() {
   document.getElementById("totalImpressions").textContent = formatNumber(summary.totalImpressions);
   document.getElementById("totalViews").textContent = formatNumber(summary.totalViews);
   document.getElementById("totalInteractions").textContent = formatNumber(summary.totalInteractions);
-  document.getElementById("syncMeta").textContent = `最近导入 ${new Date(summary.generatedAt).toLocaleString("zh-CN")}，跳过 ${summary.skippedFileCount} 个重复或失败文件`;
+  document.getElementById("syncMeta").textContent = ``;
 }
 
 function renderLifecycleChart() {
@@ -2191,9 +2202,6 @@ document.getElementById("strategyNoteSelect").addEventListener("change", (event)
   state.strategyPayload = null;
   loadStrategyPayload();
 });
-document.getElementById("analyzeCoverBtn").addEventListener("click", (event) => {
-  runCoverAnalysis(state.strategyNoteKey, event.currentTarget);
-});
 document.getElementById("generateStrategyBtn").addEventListener("click", generateStrategy);
 document.getElementById("notesCompareSearch").addEventListener("input", (event) => {
   state.notesCompareSearch = event.target.value;
@@ -2330,6 +2338,18 @@ document.addEventListener("click", (event) => {
   const startExperimentButton = event.target.closest("[data-start-experiment]");
   if (startExperimentButton) {
     startContentExperiment(Number(startExperimentButton.dataset.startExperiment));
+    return;
+  }
+
+  const toggleExperimentButton = event.target.closest("[data-toggle-experiment]");
+  if (toggleExperimentButton) {
+    const experimentId = toggleExperimentButton.dataset.toggleExperiment;
+    if (state.expandedExperiments.has(experimentId)) {
+      state.expandedExperiments.delete(experimentId);
+    } else {
+      state.expandedExperiments.add(experimentId);
+    }
+    renderExperimentLab();
     return;
   }
 

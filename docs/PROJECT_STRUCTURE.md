@@ -237,7 +237,7 @@ xhs-data-exporter/
 | `POST /api/note-reviews` | 保存某篇笔记的人工复盘 | 写 `note-reviews.json` |
 | `GET /api/content-strategy/:noteKey` | 获取规则事实、自动中文字幕、缓存分析和模型状态 | 读主数据、Profile 字幕与 AI 缓存 |
 | `POST /api/content-strategy/cover` | 调用视觉模型分析封面 | 写 AI 分析 |
-| `POST /api/content-strategy/recommend` | 调用文本模型生成下一条建议 | 写 AI 分析 |
+| `POST /api/content-strategy/recommend` | 先调用视觉模型分析封面，再调用文本模型生成下一条建议 | 写 AI 分析 |
 | `GET /api/content-experiments` | 获取内容实验卡片 | 读 `content-experiments.json` |
 | `POST /api/content-experiments` | 从 AI 建议创建实验卡片 | 写 `content-experiments.json` |
 | `PATCH /api/content-experiments/:experimentId/match` | 将导入后的笔记匹配到实验卡片并记录验证快照 | 写 `content-experiments.json` |
