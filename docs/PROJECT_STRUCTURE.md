@@ -47,6 +47,8 @@ flowchart LR
   O --> P["public/app.js + ECharts"]
   L --> Q["src/bailian-client.js"]
   Q --> R["阿里云百炼 API"]
+  L --> S["/api/content-checker/*"]
+  S --> T["MySQL 审核账户与记录"]
 ```
 
 关键边界：
@@ -89,7 +91,10 @@ xhs-data-exporter/
 │  ├─ bailian-client.js                    # 百炼请求、模型输出校验
 │  ├─ ai-analysis-store.js                 # AI 分析结果存储
 │  ├─ content-experiment-store.js          # 内容实验卡片与验证匹配存储
-│  └─ dashboard-server.js                  # Express API 与静态站点
+│  ├─ content-checker-auth.js              # 发布前检测账户密码与会话
+│  ├─ content-checker-moderation.js        # 发布前检测规则与模型复核
+│  ├─ content-checker-router.js            # 同源审核 API 路由
+│  └─ dashboard-server.js                  # Express API、审核路由与静态站点
 ├─ test/
 │  ├─ metric-field-mapping.test.js
 │  ├─ content-diagnostics.test.js
@@ -98,7 +103,10 @@ xhs-data-exporter/
 │  ├─ content-experiment-store.test.js
 │  ├─ bailian-client.test.js
 │  ├─ debug-logger.test.js
+│  ├─ content-checker-moderation.test.js
 │  └─ console-logger.test.js
+├─ db/
+│  └─ content-checker-schema.sql           # 审核账户与记录的 MySQL schema
 ├─ data/                                   # 运行时统一数据、复盘、AI 结果、截图
 ├─ downloads/                              # 小红书原始导出文件
 ├─ logs/                                   # 导出、仪表盘和 debug 日志
@@ -206,6 +214,10 @@ xhs-data-exporter/
   - 默认监听 `5178`，可用 `XHS_DASHBOARD_PORT` 修改。
   - 若主数据不存在，`GET /api/data` 会触发一次导入；主数据存在时直接读取，不自动扫描新下载文件。
   - 将统一数据与人工复盘、AI 分析结果、内容实验卡片组合后返回前端。
+  - 将发布前检测挂载到同一进程的 `/api/content-checker/*`；不会启动第二个 HTTP 端口。
+- `src/content-checker-router.js`
+  - 提供发布前检测、账户、会员、审核记录和实操库 API。
+  - 未登录检测不写入 MySQL；登录后的记录和上传资产分别写入 MySQL 与受限目录。
 - `src/note-review-store.js`
   - 以 `noteKey` 保存人工标签、系列、前 5 秒结构和备注。
   - 自定义选项会被持久化，并与默认选项合并。

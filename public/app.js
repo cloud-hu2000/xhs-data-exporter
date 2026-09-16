@@ -26,6 +26,7 @@ const state = {
     notes: { page: 1, pageSize: 10, sortKey: "cesScore", sortDir: "desc" }
   },
   view: "lifecycle",
+  checkerTab: "audit",
   chart: null,
   publishChart: null,
   funnelChart: null,
@@ -81,7 +82,17 @@ const VIEW_META = {
   cover: ["数据看板 / 封面分析", "封面分析"],
   notes: ["数据看板 / 笔记横向对比", "笔记横向对比"],
   strategy: ["数据看板 / 下一条做什么", "下一条做什么内容"],
-  experiments: ["数据看板 / 内容实验室", "内容实验室"]
+  experiments: ["数据看板 / 内容实验室", "内容实验室"],
+  precheck: ["发布前工具 / 笔记卫士", "发布前检测"]
+};
+
+const CHECKER_TAB_META = {
+  audit: ["发布前工具 / 发布前检测", "发布前检测"],
+  history: ["发布前工具 / 检测记录", "检测记录"],
+  knowledge: ["发布前工具 / 知识库", "知识库"],
+  practice: ["发布前工具 / 实操库", "实操库"],
+  membership: ["发布前工具 / 会员中心", "会员中心"],
+  admin: ["发布前工具 / 管理实操库", "管理实操库"]
 };
 
 function formatNumber(value) {
@@ -1147,10 +1158,12 @@ function activeStrategyAnalysis() {
   return state.strategyPayload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
 }
 
-function setView(view) {
+function setView(view, checkerTab) {
   state.view = VIEW_META[view] ? view : "lifecycle";
+  if (checkerTab && CHECKER_TAB_META[checkerTab]) state.checkerTab = checkerTab;
   document.querySelectorAll(".menu-item").forEach((menu) => {
-    menu.classList.toggle("active", menu.dataset.view === state.view);
+    const isCheckerItem = Boolean(menu.dataset.checkerTab);
+    menu.classList.toggle("active", menu.dataset.view === state.view && (!isCheckerItem || menu.dataset.checkerTab === state.checkerTab));
   });
   renderView();
 }
@@ -2113,9 +2126,19 @@ function renderView() {
   });
   const breadcrumb = document.querySelector(".breadcrumb");
   const heading = document.querySelector(".main-top h1");
-  const meta = VIEW_META[state.view] || VIEW_META.lifecycle;
+  const meta = state.view === "precheck" ? (CHECKER_TAB_META[state.checkerTab] || CHECKER_TAB_META.audit) : (VIEW_META[state.view] || VIEW_META.lifecycle);
   breadcrumb.textContent = meta[0];
   heading.textContent = meta[1];
+  const precheckActive = state.view === "precheck";
+  const pageKicker = document.querySelector(".page-kicker");
+  if (pageKicker) pageKicker.textContent = precheckActive ? "发布前工具" : "数据看板";
+  document.querySelector(".compact-summary")?.classList.toggle("hidden", precheckActive);
+  document.querySelector(".data-status")?.classList.toggle("hidden", precheckActive);
+  document.getElementById("refreshBtn")?.classList.toggle("hidden", precheckActive);
+  document.getElementById("checkerAuthSlot")?.classList.toggle("hidden", !precheckActive);
+  if (state.view === "precheck") {
+    window.ContentChecker?.show(state.checkerTab);
+  }
   if (state.view === "publish") {
     setTimeout(() => state.publishChart && state.publishChart.resize(), 0);
   } else if (state.view === "funnel") {
@@ -2391,10 +2414,19 @@ document.addEventListener("change", (event) => {
 
 document.querySelectorAll(".menu-item").forEach((item) => {
   item.addEventListener("click", () => {
-    setView(item.dataset.view);
+    setView(item.dataset.view, item.dataset.checkerTab);
   });
+});
+
+window.addEventListener("content-checker-tabchange", (event) => {
+  const tab = event.detail?.tab;
+  if (!CHECKER_TAB_META[tab] || state.checkerTab === tab) return;
+  state.checkerTab = tab;
+  if (state.view === "precheck") setView("precheck");
 });
 
 loadData().catch((error) => {
   document.getElementById("syncMeta").textContent = `读取失败：${error.message}`;
 });
+
+window.ContentChecker?.init();

@@ -7,6 +7,7 @@ const { importData, dataDir } = require("./import-xhs-data");
 const { createNoteReviewStore } = require("./note-review-store");
 const { createAiAnalysisStore } = require("./ai-analysis-store");
 const { createContentExperimentStore } = require("./content-experiment-store");
+const { createContentCheckerRouter } = require("./content-checker-router");
 const { createProfileTranscriptReader } = require("./profile-transcript");
 const { buildEvidenceCatalog, buildFactDiagnostics, compactAccountContext } = require("./content-strategy");
 const Bailian = require("./bailian-client");
@@ -21,6 +22,7 @@ const noteReviewPath = path.join(dataDir, "note-reviews.json");
 const aiAnalysisPath = path.join(dataDir, "ai-content-analysis.json");
 const contentExperimentPath = path.join(dataDir, "content-experiments.json");
 const port = Number(process.env.XHS_DASHBOARD_PORT || 5178);
+const host = process.env.XHS_DASHBOARD_HOST || "127.0.0.1";
 const noteReviewStore = createNoteReviewStore(noteReviewPath);
 const aiAnalysisStore = createAiAnalysisStore(aiAnalysisPath);
 const contentExperimentStore = createContentExperimentStore(contentExperimentPath);
@@ -73,9 +75,11 @@ function analysisContext(noteKey) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(publicDir));
 app.use("/vendor/echarts", express.static(path.join(projectRoot, "node_modules", "echarts", "dist")));
+app.use("/api/content-checker", createContentCheckerRouter({ projectRoot }));
 
 app.get("/api/data", (req, res) => {
   res.json(readDecoratedData());
@@ -204,6 +208,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Xiaohongshu analysis center: http://localhost:${port}`);
+app.listen(port, host, () => {
+  console.log(`Xiaohongshu analysis center: http://${host}:${port}`);
 });

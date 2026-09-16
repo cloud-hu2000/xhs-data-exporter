@@ -8,7 +8,8 @@ const defaults = {
   debugPort: 9222,
   targetUrl: "https://creator.xiaohongshu.com/statistics/data-analysis",
   downloadDir: "./downloads",
-  detailTexts: ["详情数据"],
+  // 小红书目前的入口文案为“分析详情”，旧版页面使用“详情数据”。
+  detailTexts: ["分析详情", "详情数据"],
   exportTexts: ["导出数据", "导出", "下载"],
   exportAllButtonsInDetail: true,
   closeTexts: ["关闭", "返回"],

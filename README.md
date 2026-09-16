@@ -8,11 +8,28 @@ https://creator.xiaohongshu.com/statistics/data-analysis
 
 ## 使用方法
 
-只需要双击唯一入口：
+Windows 下双击：
 
 ```text
 run.bat
 ```
+
+macOS 下双击 `run.command`；若系统提示权限不足，可在终端进入本目录后执行一次：
+
+```bash
+chmod +x run.command
+./run.command
+```
+
+工具会自动寻找 macOS 的 Google Chrome、Chrome for Testing、Chromium 或 Microsoft Edge。每次都会使用项目内独立的浏览器配置目录（例如 `.chrome-profile-9222`），不会占用或修改日常 Chrome 的登录资料。首次运行请在这个独立窗口中登录小红书；之后会保留登录状态。
+
+如果 Chrome 安装在非标准位置，可指定可执行文件后运行：
+
+```bash
+CHROME_PATH="/完整路径/Google Chrome.app/Contents/MacOS/Google Chrome" ./run.command
+```
+
+若要将独立配置目录放在其他位置，可额外设置 `XHS_BROWSER_PROFILE_DIR`。
 
 首次运行会自动检查并安装依赖。推荐选择“一键完整流程”，按提示完成登录确认后，工具会自动：
 
@@ -64,7 +81,7 @@ C:\Users\FG\Documents\mutiDataAnalysis\xhs-data-exporter\data
 
 ```json
 {
-  "detailTexts": ["详情数据"],
+  "detailTexts": ["分析详情", "详情数据"],
   "exportTexts": ["导出数据", "导出", "下载"],
   "exportAllButtonsInDetail": true,
   "closeTexts": ["关闭", "返回"],

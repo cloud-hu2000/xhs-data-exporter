@@ -54,6 +54,34 @@
             </button>
           </div>
 
+          <div class="menu-group">
+            <div class="menu-label">发布前工具</div>
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="audit">
+              <span class="menu-icon">✓</span>
+              发布前检测
+            </button>
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="history">
+              <span class="menu-icon">◷</span>
+              检测记录
+            </button>
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="knowledge">
+              <span class="menu-icon">◇</span>
+              知识库
+            </button>
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="practice">
+              <span class="menu-icon">▤</span>
+              实操库
+            </button>
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="membership">
+              <span class="menu-icon">♙</span>
+              会员中心
+            </button>
+            <button class="menu-item hidden" type="button" data-view="precheck" data-checker-tab="admin">
+              <span class="menu-icon">⚙</span>
+              管理实操库
+            </button>
+          </div>
+
           <div class="sidebar-tip">
             <span class="sidebar-tip-icon">✦</span>
             <div>
@@ -76,6 +104,7 @@
           <div class="top-actions">
             <span class="data-status"><i></i> 本地数据已连接</span>
             <button id="refreshBtn" class="button primary" type="button">导入新数据</button>
+            <div id="checkerAuthSlot" class="checker-auth-slot hidden"></div>
           </div>
         </header>
 
@@ -113,6 +142,11 @@
             </div>
           </div>
           <div class="summary-meta" id="syncMeta">正在读取本地导出数据...</div>
+        </section>
+
+        <section class="view-panel hidden checker-panel" data-panel="precheck">
+          <div id="checkerStatus" class="checker-status" role="status"></div>
+          <div id="checkerContent"></div>
         </section>
 
         <section class="content-card view-panel hidden" data-panel="funnel">
@@ -526,6 +560,7 @@
 
     <script src="/vendor/echarts/echarts.min.js"></script>
     <script src="./content-diagnostics.js"></script>
+    <script src="./content-checker.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
