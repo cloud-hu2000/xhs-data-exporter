@@ -80,6 +80,9 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.static(publicDir));
 app.use("/vendor/echarts", express.static(path.join(projectRoot, "node_modules", "echarts", "dist")));
 app.use("/api/content-checker", createContentCheckerRouter({ projectRoot }));
+app.get("/api/content-checker-config", (req, res) => {
+  res.json({ apiBase: process.env.XHS_CONTENT_CHECKER_API_BASE || "/api/content-checker" });
+});
 
 app.get("/api/data", (req, res) => {
   res.json(readDecoratedData());

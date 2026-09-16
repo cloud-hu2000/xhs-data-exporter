@@ -1,7 +1,7 @@
-/* Same-origin client for the pre-publication workspace. */
+/* The dashboard stays local; this client may use a separately deployed API. */
 (function () {
   const TOKEN_KEY = "xhs-content-checker.session-token";
-  const API_BASE = "/api/content-checker";
+  let apiBase;
   const state = { user: null, tab: "audit", report: null, previews: [], admin: false, articles: [] };
   const knowledge = [
     ["01", "发布节奏", "保持固定更新频率", "一周 1～3 篇都正常，尽量固定时间更新；避免一天内连续发布多篇内容。"],
@@ -18,10 +18,21 @@
     if (target) { target.textContent = message; target.classList.toggle("error", error); }
   };
   const token = () => localStorage.getItem(TOKEN_KEY) || "";
+  const resolveApiBase = async () => {
+    if (apiBase) return apiBase;
+    try {
+      const response = await fetch("/api/content-checker-config");
+      const config = await response.json();
+      apiBase = String(config.apiBase || "/api/content-checker").replace(/\/$/, "");
+    } catch {
+      apiBase = "/api/content-checker";
+    }
+    return apiBase;
+  };
   const api = async (pathname, options = {}) => {
     const headers = new Headers(options.headers || {});
-    if (token()) headers.set("Authorization", `Bearer ${token()}`);
-    const response = await fetch(`${API_BASE}${pathname}`, { ...options, headers, credentials: "include" });
+    if (token()) headers.set("Authorization", "Bearer " + token());
+    const response = await fetch((await resolveApiBase()) + pathname, { ...options, headers, credentials: "include" });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `服务返回 ${response.status}`);
     return payload;

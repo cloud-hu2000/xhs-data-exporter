@@ -7,10 +7,11 @@ on:
       - ".github/workflows/deploy-backend.yml"
       - "package.json"
       - "package-lock.json"
-      - "config.json"
-      - "src/**"
-      - "public/**"
-      - "db/**"
+      - "src/content-checker-api-server.js"
+      - "src/content-checker-router.js"
+      - "src/content-checker-auth.js"
+      - "src/content-checker-moderation.js"
+      - "src/env.js"
   workflow_dispatch:
 
 concurrency:
@@ -42,13 +43,13 @@ jobs:
       - name: Create release archive
         run: |
           tar -czf /tmp/xhs-data-exporter-release.tar.gz \
-            --exclude=.git \
-            --exclude=.env \
-            --exclude=node_modules \
-            --exclude=data \
-            --exclude=downloads \
-            --exclude=logs \
-            .
+            package.json \
+            package-lock.json \
+            src/content-checker-api-server.js \
+            src/content-checker-router.js \
+            src/content-checker-auth.js \
+            src/content-checker-moderation.js \
+            src/env.js
 
       - name: Install SSH tools
         run: |
@@ -106,14 +107,11 @@ jobs:
           trap rollback EXIT
 
           test -d "$app_root/releases"
-          test -d "$shared_dir/data"
           test -d "$shared_dir/uploads"
           test -f "$env_file"
           test ! -e "$release_dir"
           mkdir -p "$release_dir"
-          tar -xzf "$archive" -C "$release_dir" --strip-components=1
-          rm -f "$release_dir/data"
-          ln -s "$shared_dir/data" "$release_dir/data"
+          tar -xzf "$archive" -C "$release_dir"
           (cd "$release_dir" && npm ci --omit=dev --no-audit --no-fund)
 
           validation='const mysql=require("mysql2/promise");(async()=>{const db=await mysql.createConnection({uri:process.env.DATABASE_URL});const [rows]=await db.execute("SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN (\"users\",\"audit_reports\",\"practice_articles\")");await db.end();if(Number(rows[0].count)!==3)process.exit(1);})().catch(()=>process.exit(1));'
