@@ -7,7 +7,7 @@ const { importData, dataDir } = require("./import-xhs-data");
 const { createNoteReviewStore } = require("./note-review-store");
 const { createAiAnalysisStore } = require("./ai-analysis-store");
 const { createContentExperimentStore } = require("./content-experiment-store");
-const { createContentCheckerRouter } = require("./content-checker-router");
+const { contentCheckerApiBase } = require("./content-checker-api-config");
 const { createProfileTranscriptReader } = require("./profile-transcript");
 const { buildEvidenceCatalog, buildFactDiagnostics, compactAccountContext } = require("./content-strategy");
 const Bailian = require("./bailian-client");
@@ -79,9 +79,20 @@ app.set("trust proxy", 1);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(publicDir));
 app.use("/vendor/echarts", express.static(path.join(projectRoot, "node_modules", "echarts", "dist")));
-app.use("/api/content-checker", createContentCheckerRouter({ projectRoot }));
+app.use("/vendor/easymde", express.static(path.join(projectRoot, "node_modules", "easymde", "dist")));
+app.use("/vendor/dompurify", express.static(path.join(projectRoot, "node_modules", "dompurify", "dist")));
 app.get("/api/content-checker-config", (req, res) => {
-  res.json({ apiBase: process.env.XHS_CONTENT_CHECKER_API_BASE || "/api/content-checker" });
+  try {
+    const apiBase = contentCheckerApiBase();
+    if (!apiBase) {
+      return res.status(503).json({
+        error: "发布前检测 API 尚未配置。请设置 XHS_CONTENT_CHECKER_API_BASE 后重启仪表盘。"
+      });
+    }
+    return res.json({ apiBase });
+  } catch (error) {
+    return res.status(503).json({ error: error.message });
+  }
 });
 
 app.get("/api/data", (req, res) => {

@@ -3,6 +3,9 @@ const express = require("express");
 const { loadEnv } = require("./env");
 const { createContentCheckerRouter } = require("./content-checker-router");
 
+// Database credentials belong to the API process, never to the dashboard.
+// Process environment still takes precedence over either file.
+loadEnv(process.env.CONTENT_CHECKER_API_ENV_FILE || path.resolve(__dirname, "..", ".env.content-checker-api"));
 loadEnv();
 
 const port = Number(process.env.CONTENT_CHECKER_API_PORT || 5179);
@@ -26,8 +29,12 @@ function applyCors(req, res) {
 }
 
 const app = express();
+app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("Referrer-Policy", "no-referrer");
   const allowed = applyCors(req, res);
   if (req.method === "OPTIONS") {
     if (!allowed) return res.sendStatus(403);

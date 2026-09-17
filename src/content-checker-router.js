@@ -34,13 +34,13 @@ function createContentCheckerRouter({ projectRoot }) {
   async function currentUser(req) {
     const token = cookieToken(req);
     if (!token) return null;
-    const result = await rows("SELECT users.id, users.email, users.display_name AS displayName, users.created_at AS createdAt, memberships.plan, memberships.status, memberships.monthly_quota AS monthlyQuota, memberships.period_ends_at AS periodEndsAt FROM sessions INNER JOIN users ON users.id = sessions.user_id INNER JOIN memberships ON memberships.user_id = users.id WHERE sessions.token_hash = ? AND sessions.expires_at > UTC_TIMESTAMP()", [hashToken(token)]);
+    const result = await rows("SELECT users.id, users.email, users.created_at AS createdAt, memberships.plan, memberships.status, memberships.monthly_quota AS monthlyQuota, memberships.period_ends_at AS periodEndsAt FROM sessions INNER JOIN users ON users.id = sessions.user_id INNER JOIN memberships ON memberships.user_id = users.id WHERE sessions.token_hash = ? AND sessions.expires_at > UTC_TIMESTAMP()", [hashToken(token)]);
     return result[0] || null;
   }
 
   function publicUser(user) {
     if (!user) return null;
-    return { id: user.id, email: user.email, displayName: user.displayName || "", createdAt: user.createdAt, plan: user.plan, status: user.status, monthlyQuota: Number(user.monthlyQuota), periodEndsAt: user.periodEndsAt };
+    return { id: user.id, email: user.email, createdAt: user.createdAt, plan: user.plan, status: user.status, monthlyQuota: Number(user.monthlyQuota), periodEndsAt: user.periodEndsAt };
   }
 
   function requireUser(handler) {
@@ -140,7 +140,7 @@ function createContentCheckerRouter({ projectRoot }) {
     if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return res.status(400).json({ error: "请输入有效邮箱，密码至少 8 位。" });
     if ((await rows("SELECT id FROM users WHERE email = ?", [email])).length) return res.status(409).json({ error: "该邮箱已经注册。" });
     const client = await database().getConnection();
-    try { await client.beginTransaction(); const userId = crypto.randomUUID(); await client.execute("INSERT INTO users (id, email, display_name, password_hash) VALUES (?,?,?,?)", [userId, email, String(req.body?.displayName || "").trim().slice(0, 40) || null, await hashPassword(password)]); await client.execute("INSERT INTO memberships (id, user_id, plan, status, monthly_quota) VALUES (?,?,'FREE','ACTIVE',3)", [crypto.randomUUID(), userId]); await client.commit(); await createSession(req, res, userId); } catch (error) { await client.rollback(); throw error; } finally { client.release(); }
+    try { await client.beginTransaction(); const userId = crypto.randomUUID(); await client.execute("INSERT INTO users (id, email, password_hash) VALUES (?,?,?)", [userId, email, await hashPassword(password)]); await client.execute("INSERT INTO memberships (id, user_id, plan, status, monthly_quota) VALUES (?,?,'FREE','ACTIVE',3)", [crypto.randomUUID(), userId]); await client.commit(); await createSession(req, res, userId); } catch (error) { await client.rollback(); throw error; } finally { client.release(); }
   } catch (error) { next(error); } });
   router.post("/auth/login", async (req, res, next) => { try {
     const email = String(req.body?.email || "").trim().toLowerCase(); const password = String(req.body?.password || "");

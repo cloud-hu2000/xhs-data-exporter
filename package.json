@@ -13,9 +13,11 @@
     "import": "node src/import-xhs-data.js",
     "dashboard": "node src/dashboard-server.js",
     "content-checker:api": "node src/content-checker-api-server.js",
-    "test": "node test/browser-path.test.js && node test/config.test.js && node test/metric-field-mapping.test.js && node test/content-diagnostics.test.js && node test/content-strategy.test.js && node test/note-review-store.test.js && node test/ai-analysis-store.test.js && node test/content-experiment-store.test.js && node test/content-checker-moderation.test.js && node test/bailian-client.test.js && node test/debug-logger.test.js && node test/playwright-utils.test.js && node test/profile-transcript.test.js && node test/console-logger.test.js"
+    "test": "node test/browser-path.test.js && node test/config.test.js && node test/metric-field-mapping.test.js && node test/content-diagnostics.test.js && node test/content-strategy.test.js && node test/note-review-store.test.js && node test/ai-analysis-store.test.js && node test/content-experiment-store.test.js && node test/content-checker-api-config.test.js && node test/content-checker-moderation.test.js && node test/bailian-client.test.js && node test/debug-logger.test.js && node test/playwright-utils.test.js && node test/profile-transcript.test.js && node test/console-logger.test.js"
   },
   "dependencies": {
+    "dompurify": "^3.4.15",
+    "easymde": "^2.21.0",
     "echarts": "^6.1.0",
     "express": "^5.2.1",
     "multer": "^2.0.2",

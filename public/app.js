@@ -25,7 +25,7 @@ const state = {
     cover: { page: 1, pageSize: 10, sortKey: "officialCoverClickRate", sortDir: "desc" },
     notes: { page: 1, pageSize: 10, sortKey: "cesScore", sortDir: "desc" }
   },
-  view: "lifecycle",
+  view: "notes",
   checkerTab: "audit",
   chart: null,
   publishChart: null,
@@ -80,19 +80,21 @@ const VIEW_META = {
   publish: ["数据看板 / 发布时间分析", "发布时间分析"],
   funnel: ["数据看板 / 内容诊断", "分叉式内容诊断"],
   cover: ["数据看板 / 封面分析", "封面分析"],
-  notes: ["数据看板 / 笔记横向对比", "笔记横向对比"],
-  strategy: ["数据看板 / 下一条做什么", "下一条做什么内容"],
+  notes: ["数据看板 / 数据总览", "数据总览"],
+  strategy: ["数据看板 / 下一条怎么做", "下一条怎么做"],
   experiments: ["数据看板 / 内容实验室", "内容实验室"],
-  precheck: ["发布前工具 / 笔记卫士", "发布前检测"]
+  precheck: ["违规检测", "违规检测"]
 };
 
 const CHECKER_TAB_META = {
-  audit: ["发布前工具 / 发布前检测", "发布前检测"],
-  history: ["发布前工具 / 检测记录", "检测记录"],
-  knowledge: ["发布前工具 / 知识库", "知识库"],
-  practice: ["发布前工具 / 实操库", "实操库"],
-  membership: ["发布前工具 / 会员中心", "会员中心"],
-  admin: ["发布前工具 / 管理实操库", "管理实操库"]
+  audit: ["违规检测 / 违规检测", "违规检测"],
+  history: ["违规检测 / 历史检测记录", "历史检测记录"],
+  knowledge: ["违规检测 / 知识库", "知识库"],
+  practice: ["违规检测 / 实操库", "实操库"],
+  membership: ["违规检测 / 会员中心", "会员中心"],
+  admin: ["违规检测 / 管理实操库", "管理实操库"],
+  login: ["违规检测 / 登录", "登录"],
+  register: ["违规检测 / 注册", "注册"]
 };
 
 function formatNumber(value) {
@@ -1158,6 +1160,23 @@ function activeStrategyAnalysis() {
   return state.strategyPayload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
 }
 
+function closeTopMenus(exceptGroup) {
+  document.querySelectorAll("[data-menu-panel]").forEach((panel) => {
+    const isExcepted = panel.dataset.menuPanel === exceptGroup;
+    panel.classList.toggle("hidden", !isExcepted);
+  });
+  document.querySelectorAll("[data-menu-toggle]").forEach((trigger) => {
+    trigger.setAttribute("aria-expanded", String(trigger.dataset.menuToggle === exceptGroup));
+  });
+}
+
+function syncTopMenuState() {
+  const activeGroup = state.view === "precheck" ? "precheck" : "analytics";
+  document.querySelectorAll("[data-menu-toggle]").forEach((trigger) => {
+    trigger.classList.toggle("active", trigger.dataset.menuToggle === activeGroup);
+  });
+}
+
 function setView(view, checkerTab) {
   state.view = VIEW_META[view] ? view : "lifecycle";
   if (checkerTab && CHECKER_TAB_META[checkerTab]) state.checkerTab = checkerTab;
@@ -1165,6 +1184,7 @@ function setView(view, checkerTab) {
     const isCheckerItem = Boolean(menu.dataset.checkerTab);
     menu.classList.toggle("active", menu.dataset.view === state.view && (!isCheckerItem || menu.dataset.checkerTab === state.checkerTab));
   });
+  syncTopMenuState();
   renderView();
 }
 
@@ -1286,7 +1306,7 @@ function renderExperimentLab() {
   const experiments = state.data.contentExperiments || [];
   container.innerHTML = experiments.length
     ? experiments.map(experimentCardHtml).join("")
-    : '<div class="empty-analysis">还没有实验卡片。先在“下一条做什么”里生成建议并点击“开始实验”。</div>';
+    : '<div class="empty-analysis">还没有实验卡片。先在“下一条怎么做”的“内容实验建议”里生成建议并点击“开始实验”。</div>';
 }
 
 async function matchContentExperiment(experimentId) {
@@ -2131,11 +2151,10 @@ function renderView() {
   heading.textContent = meta[1];
   const precheckActive = state.view === "precheck";
   const pageKicker = document.querySelector(".page-kicker");
-  if (pageKicker) pageKicker.textContent = precheckActive ? "发布前工具" : "数据看板";
+  if (pageKicker) pageKicker.textContent = precheckActive ? "违规检测" : "数据看板";
   document.querySelector(".compact-summary")?.classList.toggle("hidden", precheckActive);
   document.querySelector(".data-status")?.classList.toggle("hidden", precheckActive);
   document.getElementById("refreshBtn")?.classList.toggle("hidden", precheckActive);
-  document.getElementById("checkerAuthSlot")?.classList.toggle("hidden", !precheckActive);
   if (state.view === "precheck") {
     window.ContentChecker?.show(state.checkerTab);
   }
@@ -2194,6 +2213,7 @@ async function refreshImport() {
 
 document.getElementById("refreshBtn").addEventListener("click", refreshImport);
 document.getElementById("experimentImportBtn").addEventListener("click", refreshImport);
+document.getElementById("openExperimentLabBtn").addEventListener("click", () => setView("experiments"));
 document.getElementById("chartMetricSelect").addEventListener("change", (event) => {
   state.chartMetric = event.target.value;
   renderLifecycleChart();
@@ -2333,6 +2353,10 @@ document.getElementById("filterTabs").addEventListener("click", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  if (!event.target.closest(".top-menu-group")) {
+    closeTopMenus();
+  }
+
   if (!event.target.closest("[data-review-dropdown]")) {
     document.querySelectorAll(".review-dropdown-menu").forEach((item) => item.classList.add("hidden"));
     document.querySelectorAll("[data-review-dropdown-toggle]").forEach((item) => item.setAttribute("aria-expanded", "false"));
@@ -2397,6 +2421,9 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeTopMenus();
+  }
   if (event.key === "Escape" && !document.getElementById("noteReviewModal").classList.contains("hidden")) {
     closeNoteReviewModal();
   }
@@ -2414,15 +2441,27 @@ document.addEventListener("change", (event) => {
 
 document.querySelectorAll(".menu-item").forEach((item) => {
   item.addEventListener("click", () => {
+    closeTopMenus();
     setView(item.dataset.view, item.dataset.checkerTab);
+  });
+});
+
+document.querySelectorAll("[data-menu-toggle]").forEach((trigger) => {
+  trigger.addEventListener("click", () => {
+    const group = trigger.dataset.menuToggle;
+    const isOpen = trigger.getAttribute("aria-expanded") === "true";
+    closeTopMenus(isOpen ? undefined : group);
   });
 });
 
 window.addEventListener("content-checker-tabchange", (event) => {
   const tab = event.detail?.tab;
-  if (!CHECKER_TAB_META[tab] || state.checkerTab === tab) return;
-  state.checkerTab = tab;
-  if (state.view === "precheck") setView("precheck");
+  if (!CHECKER_TAB_META[tab]) return;
+  if (state.view !== "precheck") {
+    setView("precheck", tab);
+    return;
+  }
+  if (state.checkerTab !== tab) setView("precheck", tab);
 });
 
 loadData().catch((error) => {

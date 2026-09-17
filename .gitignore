@@ -8,6 +8,7 @@ data/
 .env
 .env.*
 !.env.example
+!.env.content-checker-api.example
 *.local
 npm-debug.log*
 yarn-debug.log*

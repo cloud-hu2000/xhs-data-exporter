@@ -9,7 +9,7 @@
   </head>
   <body>
     <div class="workspace">
-      <aside class="sidebar">
+      <header class="app-header">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">
             <span></span>
@@ -18,13 +18,17 @@
             <div class="brand-name">小红书数据助手</div>
             <div class="brand-sub">Creator Analytics</div>
           </div>
-          <span class="pro-badge">Pro</span>
         </div>
 
-        <nav class="menu">
-          <div class="menu-group">
-            <div class="menu-label">数据分析</div>
-            <button class="menu-item active" type="button" data-view="lifecycle">
+        <nav class="top-navigation" aria-label="主导航">
+          <div class="top-menu-group" data-menu-group="analytics">
+            <button class="top-menu-trigger active" type="button" data-menu-toggle="analytics" aria-expanded="false" aria-controls="analyticsMenu">
+              <span class="top-menu-icon" aria-hidden="true">▦</span>
+              <span>数据分析</span>
+              <span class="top-menu-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="analyticsMenu" class="top-menu-panel hidden" data-menu-panel="analytics" role="menu" aria-label="数据分析">
+            <button class="menu-item" type="button" data-view="lifecycle">
               <span class="menu-icon">▥</span>
               生命周期对比
             </button>
@@ -32,7 +36,7 @@
               <span class="menu-icon">◷</span>
               发布时间分析
             </button>
-            <button class="menu-item" type="button" data-view="funnel">
+            <button class="menu-item hidden" type="button" data-view="funnel">
               <span class="menu-icon">◇</span>
               内容诊断
             </button>
@@ -40,29 +44,31 @@
               <span class="menu-icon">▧</span>
               封面分析
             </button>
-            <button class="menu-item" type="button" data-view="notes">
+            <button class="menu-item active" type="button" data-view="notes">
               <span class="menu-icon">☷</span>
               数据总览
             </button>
             <button class="menu-item" type="button" data-view="strategy">
               <span class="menu-icon">✦</span>
-              下一条做什么
+              下一条怎么做
             </button>
-            <button class="menu-item" type="button" data-view="experiments">
-              <span class="menu-icon">▣</span>
-              内容实验室
-            </button>
+            </div>
           </div>
 
-          <div class="menu-group">
-            <div class="menu-label">发布前工具</div>
+          <div class="top-menu-group" data-menu-group="precheck">
+            <button class="top-menu-trigger" type="button" data-menu-toggle="precheck" aria-expanded="false" aria-controls="precheckMenu">
+              <span class="top-menu-icon" aria-hidden="true">✓</span>
+              <span>违规检测</span>
+              <span class="top-menu-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <div id="precheckMenu" class="top-menu-panel hidden" data-menu-panel="precheck" role="menu" aria-label="违规检测">
             <button class="menu-item" type="button" data-view="precheck" data-checker-tab="audit">
               <span class="menu-icon">✓</span>
-              发布前检测
+              违规检测
             </button>
             <button class="menu-item" type="button" data-view="precheck" data-checker-tab="history">
               <span class="menu-icon">◷</span>
-              检测记录
+              历史检测记录
             </button>
             <button class="menu-item" type="button" data-view="precheck" data-checker-tab="knowledge">
               <span class="menu-icon">◇</span>
@@ -72,39 +78,29 @@
               <span class="menu-icon">▤</span>
               实操库
             </button>
-            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="membership">
-              <span class="menu-icon">♙</span>
-              会员中心
-            </button>
             <button class="menu-item hidden" type="button" data-view="precheck" data-checker-tab="admin">
               <span class="menu-icon">⚙</span>
               管理实操库
             </button>
-          </div>
-
-          <div class="sidebar-tip">
-            <span class="sidebar-tip-icon">✦</span>
-            <div>
-              <strong>让数据指导创作</strong>
-              <p>持续导入数据，获得更准确的内容洞察。</p>
             </div>
           </div>
         </nav>
-      </aside>
+
+        <div id="checkerAuthSlot" class="checker-auth-slot" aria-label="账户操作"></div>
+      </header>
 
       <main class="main">
         <header class="main-top">
           <div class="page-heading">
             <div class="heading-row">
-              <h1>笔记生命周期对比</h1>
+              <h1>数据总览</h1>
               <span class="page-kicker">数据看板</span>
             </div>
-            <div class="breadcrumb">全面了解笔记从发布到长尾的表现变化</div>
+            <div class="breadcrumb">数据看板 / 数据总览</div>
           </div>
           <div class="top-actions">
             <span class="data-status"><i></i> 本地数据已连接</span>
             <button id="refreshBtn" class="button primary" type="button">导入新数据</button>
-            <div id="checkerAuthSlot" class="checker-auth-slot hidden"></div>
           </div>
         </header>
 
@@ -245,7 +241,7 @@
         <section class="content-card view-panel hidden" data-panel="strategy">
           <div class="panel-head">
             <div>
-              <h2>下一条做什么内容</h2>
+              <h2>下一条怎么做</h2>
               <p>规则层先确认数据事实，AI 再结合封面、文案和账号历史提出假设与下一轮实验。已导出的中文字幕会自动带入视频转写文本。</p>
             </div>
             <div class="toolbar">
@@ -301,6 +297,7 @@
                   <h3>内容实验建议</h3>
                   <p>每条建议会生成交付标题、封面提示词、前 5 秒、结构、发布时间和验证指标。</p>
                 </div>
+                <button id="openExperimentLabBtn" class="button" type="button">查看内容实验室</button>
               </div>
               <div id="strategyResult" class="strategy-result empty-analysis">尚未生成建议。</div>
             </section>
@@ -321,10 +318,10 @@
           <div id="experimentLab" class="experiment-lab"></div>
         </section>
 
-        <section class="content-card view-panel hidden" data-panel="notes">
+        <section class="content-card view-panel" data-panel="notes">
           <div class="panel-head">
             <div>
-              <h2>笔记横向对比</h2>
+              <h2>数据总览</h2>
               <p>按关键指标横向比较每篇笔记，包含 CES评分（点赞×1 + 收藏×1 + 评论×4 + 分享×4 + 关注/涨粉×8）等衍生指标。</p>
             </div>
             <div class="toolbar">
@@ -439,7 +436,7 @@
           <div id="notesPagination" class="pagination-bar"></div>
         </section>
 
-        <section class="content-card view-panel" data-panel="lifecycle">
+        <section class="content-card view-panel hidden" data-panel="lifecycle">
           <div class="panel-head">
             <div>
               <h2>发布后时间轴</h2>
@@ -526,7 +523,7 @@
           <div id="publishPagination" class="pagination-bar"></div>
         </section>
 
-        <section class="content-card view-panel" data-panel="lifecycle">
+        <section class="content-card view-panel hidden" data-panel="lifecycle">
           <div class="panel-head tight">
             <div>
               <h2>笔记表现矩阵</h2>
@@ -558,8 +555,11 @@
       </main>
     </div>
 
+    <link rel="stylesheet" href="/vendor/easymde/easymde.min.css" />
     <script src="/vendor/echarts/echarts.min.js"></script>
     <script src="./content-diagnostics.js"></script>
+    <script src="/vendor/dompurify/purify.min.js"></script>
+    <script src="/vendor/easymde/easymde.min.js"></script>
     <script src="./content-checker.js"></script>
     <script src="./app.js"></script>
   </body>

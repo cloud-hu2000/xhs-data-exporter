@@ -2,7 +2,7 @@
 (function () {
   const TOKEN_KEY = "xhs-content-checker.session-token";
   let apiBase;
-  const state = { user: null, tab: "audit", report: null, previews: [], admin: false, articles: [] };
+  const state = { user: null, tab: "audit", report: null, previews: [], admin: false, articles: [], articleEditor: null };
   const knowledge = [
     ["01", "发布节奏", "保持固定更新频率", "一周 1～3 篇都正常，尽量固定时间更新；避免一天内连续发布多篇内容。"],
     ["02", "发布时间", "注意发布时间", "可结合通勤、午休、晚饭和睡前等用户高频浏览时段安排发布。"],
@@ -13,6 +13,10 @@
   ];
 
   const escape = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const sanitizeMarkdownHtml = (html) => window.DOMPurify ? window.DOMPurify.sanitize(html) : escape(html);
+  const renderMarkdown = (markdown) => window.EasyMDE
+    ? window.EasyMDE.prototype.markdown.call({ options: { renderingConfig: { sanitizerFunction: sanitizeMarkdownHtml } } }, markdown)
+    : escape(markdown).replace(/\n/g, "<br>");
   const status = (message = "", error = false) => {
     const target = document.getElementById("checkerStatus");
     if (target) { target.textContent = message; target.classList.toggle("error", error); }
@@ -20,13 +24,12 @@
   const token = () => localStorage.getItem(TOKEN_KEY) || "";
   const resolveApiBase = async () => {
     if (apiBase) return apiBase;
-    try {
-      const response = await fetch("/api/content-checker-config");
-      const config = await response.json();
-      apiBase = String(config.apiBase || "/api/content-checker").replace(/\/$/, "");
-    } catch {
-      apiBase = "/api/content-checker";
+    const response = await fetch("/api/content-checker-config");
+    const config = await response.json().catch(() => ({}));
+    if (!response.ok || !config.apiBase) {
+      throw new Error(config.error || "发布前检测 API 配置不可用。");
     }
+    apiBase = String(config.apiBase).replace(/\/$/, "");
     return apiBase;
   };
   const api = async (pathname, options = {}) => {
@@ -53,9 +56,9 @@
     const target = document.getElementById("checkerAuthSlot");
     if (!target) return;
     if (state.user) {
-      target.innerHTML = `<span>${escape(state.user.displayName || state.user.email)}</span><button class="button" data-checker-action="logout">退出登录</button>`;
+      target.innerHTML = `<span class="checker-account-email">${escape(state.user.email)}</span><button class="button" data-checker-action="show-membership">会员中心</button><button class="button" data-checker-action="logout">退出登录</button>`;
     } else {
-      target.innerHTML = `<button class="button" data-checker-action="show-login">登录 / 注册</button>`;
+      target.innerHTML = `<button class="button" data-checker-action="show-login">登录</button><button class="button primary" data-checker-action="show-register">注册</button>`;
     }
     document.querySelector('[data-checker-tab="admin"]')?.classList.toggle("hidden", !state.admin);
   }
@@ -84,7 +87,7 @@
   }
 
   function auditView() {
-    return `<div class="checker-hero"><div><span class="panel-kicker">PRE-PUBLISH AUDIT</span><h3>文案检测助手</h3><p>识别敏感表达、导流、夸大承诺，并结合图片与全文语境提供修改建议。</p></div><div class="checker-demo-card"><b>发布前审核报告</b><strong>风险可见，修改有据</strong><span>审核不代表平台官方结论</span></div></div>
+    return `
       <form id="checkerAuditForm" class="checker-form">
         <div class="checker-form-head"><h3>开始检测笔记</h3><label>平台 <select name="platform"><option value="XIAOHONGSHU">小红书</option><option value="DOUYIN">抖音</option></select></label></div>
         <div class="checker-form-grid"><div><label>标题 <small>最多 120 字</small><input name="title" maxlength="120" placeholder="输入笔记标题" /></label><label>图片 <small>最多 18 张，每张 10MB</small><input id="checkerImages" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple /></label><div id="checkerPreviews" class="checker-previews"></div></div><div><label>正文 <small>最多 5,000 字</small><textarea name="body" maxlength="5000" placeholder="粘贴或输入笔记正文。"></textarea></label><p class="checker-disclaimer">检测结果是发布前风险提示，不代表小红书、抖音或其他平台的官方审核结论。</p><button class="button primary" type="submit">开始 AI 检测</button></div></div>
@@ -94,7 +97,7 @@
   async function historyView() {
     if (!state.user) return loginRequired("登录后查看并跨设备保存完整检测记录。");
     const { audits } = await api("/audits");
-    return `<section class="checker-page-head"><div><span class="panel-kicker">MY AUDITS</span><h3>检测记录</h3></div><button class="button primary" data-checker-action="select-tab" data-tab="audit">新建检测</button></section><div class="checker-history">${audits.length ? audits.map((audit) => `<details><summary><b>${escape(audit.title || "未命名检测")}</b><span>${escape(audit.platform === "DOUYIN" ? "抖音" : "小红书")}</span><span class="risk-badge risk-${escape(audit.overallRisk)}">${riskName(audit.overallRisk)} ${audit.score}</span><time>${date(audit.createdAt)}</time></summary><div class="checker-history-detail"><p><b>正文：</b>${escape(audit.body || "未填写")}</p>${(audit.issues || []).map((issue) => `<article><span class="risk-badge risk-${escape(issue.severity)}">${riskName(issue.severity)}</span><b>${escape(issue.category)}</b><p>证据：${escape(issue.evidence)}</p><p>建议：${escape(issue.suggestion)}</p></article>`).join("")}</div></details>`).join("") : "<p class=\"checker-empty\">还没有云端检测记录。</p>"}</div>`;
+    return `<section class="checker-page-head"><div><span class="panel-kicker">MY AUDITS</span><h3>历史检测记录</h3></div><button class="button primary" data-checker-action="select-tab" data-tab="audit">新建检测</button></section><div class="checker-history">${audits.length ? audits.map((audit) => `<details><summary><b>${escape(audit.title || "未命名检测")}</b><span>${escape(audit.platform === "DOUYIN" ? "抖音" : "小红书")}</span><span class="risk-badge risk-${escape(audit.overallRisk)}">${riskName(audit.overallRisk)} ${audit.score}</span><time>${date(audit.createdAt)}</time></summary><div class="checker-history-detail"><p><b>正文：</b>${escape(audit.body || "未填写")}</p>${(audit.issues || []).map((issue) => `<article><span class="risk-badge risk-${escape(issue.severity)}">${riskName(issue.severity)}</span><b>${escape(issue.category)}</b><p>证据：${escape(issue.evidence)}</p><p>建议：${escape(issue.suggestion)}</p></article>`).join("")}</div></details>`).join("") : "<p class=\"checker-empty\">还没有云端检测记录。</p>"}</div>`;
   }
 
   function knowledgeView() {
@@ -115,11 +118,12 @@
 
   async function adminView() {
     const { articles } = await api("/admin/practice");
-    return `<section class="checker-page-head"><div><span class="panel-kicker">ADMIN</span><h3>管理实操库</h3><p>创建、编辑并发布实操文章。</p></div></section><div class="checker-admin-grid"><form id="checkerArticleForm" class="checker-form"><input type="hidden" name="id" /><label>标题<input name="title" maxlength="160" required /></label><label>状态<select name="status"><option value="DRAFT">草稿</option><option value="PUBLISHED">发布</option><option value="OFFLINE">下线</option></select></label><label>正文<textarea name="body" required placeholder="支持 Markdown 文本"></textarea></label><button class="button primary" type="submit">保存文章</button><button class="button" type="button" data-checker-action="new-article">新建</button></form><div class="checker-admin-list">${articles.map((article) => `<button data-checker-action="edit-article" data-article="${escape(encodeURIComponent(JSON.stringify(article)))}"><span>${escape(article.status)} · ${date(article.updatedAt)}</span><b>${escape(article.title)}</b></button>`).join("") || "暂无文章"}</div></div>`;
+    return `<section class="checker-page-head"><div><span class="panel-kicker">ADMIN</span><h3>管理实操库</h3><p>创建、编辑并发布实操文章。</p></div></section><div class="checker-admin-grid"><form id="checkerArticleForm" class="checker-form"><input type="hidden" name="id" /><label>标题<input name="title" maxlength="160" required /></label><label>状态<select name="status"><option value="DRAFT">草稿</option><option value="PUBLISHED">发布</option><option value="OFFLINE">下线</option></select></label><div class="checker-markdown-field"><div class="checker-markdown-label"><label for="checkerArticleBody">正文</label><small>支持 Markdown，右侧可实时预览</small></div><textarea id="checkerArticleBody" name="body" required placeholder="开始撰写文章…"></textarea></div><div class="checker-form-actions"><button class="button primary" type="submit">保存文章</button><button class="button" type="button" data-checker-action="new-article">新建</button></div></form><div class="checker-admin-list">${articles.map((article) => `<button data-checker-action="edit-article" data-article="${escape(encodeURIComponent(JSON.stringify(article)))}"><span>${escape(article.status)} · ${date(article.updatedAt)}</span><b>${escape(article.title)}</b></button>`).join("") || "暂无文章"}</div></div>`;
   }
 
-  function loginRequired(message) { return `<section class="checker-login-required"><h3>${escape(message)}</h3><button class="button primary" data-checker-action="show-login">登录 / 注册</button></section>`; }
-  function loginView() { return `<form id="checkerAuthForm" class="checker-auth-form"><span class="panel-kicker">ACCOUNT</span><h3>登录或注册</h3><label>称呼 <input name="displayName" maxlength="40" placeholder="注册时填写" /></label><label>邮箱 <input name="email" type="email" required /></label><label>密码 <input name="password" type="password" minlength="8" required /></label><div><button class="button primary" name="mode" value="login">登录</button><button class="button" name="mode" value="register">注册</button><button class="button" type="button" data-checker-action="back">返回</button></div></form>`; }
+  function loginRequired(message) { return `<section class="checker-login-required"><h3>${escape(message)}</h3><button class="button primary" data-checker-action="show-login">登录</button><button class="button" data-checker-action="show-register">注册</button></section>`; }
+  function loginView() { return `<form id="checkerAuthForm" class="checker-auth-form" data-auth-mode="login"><span class="panel-kicker">ACCOUNT</span><h3>登录</h3><label>邮箱 <input name="email" type="email" autocomplete="email" required /></label><label>密码 <input name="password" type="password" autocomplete="current-password" minlength="8" required /></label><div><button class="button primary" type="submit">登录</button><button class="button" type="button" data-checker-action="show-register">去注册</button><button class="button" type="button" data-checker-action="back">返回</button></div></form>`; }
+  function registerView() { return `<form id="checkerAuthForm" class="checker-auth-form" data-auth-mode="register"><span class="panel-kicker">ACCOUNT</span><h3>注册</h3><label>邮箱 <input name="email" type="email" autocomplete="email" required /></label><label>密码 <input name="password" type="password" autocomplete="new-password" minlength="8" required /></label><div><button class="button primary" type="submit">注册</button><button class="button" type="button" data-checker-action="show-login">去登录</button><button class="button" type="button" data-checker-action="back">返回</button></div></form>`; }
 
   async function render() {
     renderAuth();
@@ -127,7 +131,9 @@
     window.dispatchEvent(new CustomEvent("content-checker-tabchange", { detail: { tab: state.tab } }));
     try {
       let html;
-      if (state.tab === "login") html = loginView(); else if (state.tab === "audit") html = auditView(); else if (state.tab === "history") html = await historyView(); else if (state.tab === "knowledge") html = knowledgeView(); else if (state.tab === "practice") html = await practiceView(); else if (state.tab === "membership") html = membershipView(); else html = await adminView();
+      if (state.tab === "login") html = loginView(); else if (state.tab === "register") html = registerView(); else if (state.tab === "audit") html = auditView(); else if (state.tab === "history") html = await historyView(); else if (state.tab === "knowledge") html = knowledgeView(); else if (state.tab === "practice") html = await practiceView(); else if (state.tab === "membership") html = membershipView(); else html = await adminView();
+      state.articleEditor?.toTextArea();
+      state.articleEditor = null;
       content.innerHTML = html;
       bindFormEvents();
     } catch (error) { content.innerHTML = `<p class="checker-empty">读取失败：${escape(error.message)}</p>`; status(error.message, true); }
@@ -139,28 +145,32 @@
     document.getElementById("checkerAuthForm")?.addEventListener("submit", submitAuth);
     document.getElementById("checkerPracticeSearch")?.addEventListener("submit", searchPractice);
     document.getElementById("checkerArticleForm")?.addEventListener("submit", saveArticle);
+    const articleBody = document.getElementById("checkerArticleBody");
+    if (articleBody && window.EasyMDE) { state.articleEditor = new window.EasyMDE({ element: articleBody, minHeight: "500px", sideBySideFullscreen: false, spellChecker: false, nativeSpellcheck: true, renderingConfig: { sanitizerFunction: sanitizeMarkdownHtml }, toolbar: ["heading", "bold", "italic", "strikethrough", "|", "quote", "unordered-list", "ordered-list", "task", "|", "link", "image", "table", "code", "|", "preview", "side-by-side", "fullscreen", "guide"] }); state.articleEditor.toggleSideBySide(); }
   }
 
   async function submitAudit(event) { event.preventDefault(); const form = new FormData(event.currentTarget); status("正在综合审核…"); try { state.report = await api("/audits", { method: "POST", body: form }); await render(); status(state.report.historyScope === "account" ? "检测完成，已保存到你的账户。" : "检测完成；登录后可保存到云端记录。"); document.getElementById("checkerResult")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (error) { status(error.message, true); } }
-  async function submitAuth(event) { event.preventDefault(); const submitter = event.submitter; const mode = submitter?.value || "login"; const form = Object.fromEntries(new FormData(event.currentTarget)); status(mode === "login" ? "正在登录…" : "正在注册…"); try { const response = await api(`/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); localStorage.setItem(TOKEN_KEY, response.token); await refreshUser(); state.tab = "audit"; await render(); status("账户已连接。"); } catch (error) { status(error.message, true); } }
+  async function submitAuth(event) { event.preventDefault(); const mode = event.currentTarget.dataset.authMode || "login"; const form = Object.fromEntries(new FormData(event.currentTarget)); status(mode === "login" ? "正在登录…" : "正在注册…"); try { const response = await api(`/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); localStorage.setItem(TOKEN_KEY, response.token); await refreshUser(); state.tab = "audit"; await render(); status("账户已连接。"); } catch (error) { status(error.message, true); } }
   async function searchPractice(event) { event.preventDefault(); try { const q = new FormData(event.currentTarget).get("q"); const { articles } = await api(`/practice?q=${encodeURIComponent(q || "")}`); state.articles = articles; const list = document.querySelector(".checker-articles"); if (list) list.innerHTML = articles.map((article) => `<button data-checker-action="article" data-id="${escape(article.id)}"><span>发布时间 ${date(article.publishedAt)}</span><h3>${escape(article.title)}</h3></button>`).join("") || "<p class=\"checker-empty\">暂无匹配文章。</p>"; } catch (error) { status(error.message, true); } }
-  async function saveArticle(event) { event.preventDefault(); const form = Object.fromEntries(new FormData(event.currentTarget)); const id = form.id; delete form.id; try { await api(id ? `/admin/practice/${id}` : "/admin/practice", { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); status("文章已保存。"); await render(); } catch (error) { status(error.message, true); } }
+  async function saveArticle(event) { event.preventDefault(); const form = Object.fromEntries(new FormData(event.currentTarget)); form.body = state.articleEditor?.value() || ""; const id = form.id; delete form.id; try { await api(id ? `/admin/practice/${id}` : "/admin/practice", { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); status("文章已保存。"); await render(); } catch (error) { status(error.message, true); } }
 
   document.addEventListener("click", async (event) => {
     const action = event.target.closest("[data-checker-action]"); if (!action) return;
     const type = action.dataset.checkerAction;
     if (type === "select-tab") { state.tab = action.dataset.tab || "audit"; await render(); return; }
     if (type === "show-login") { state.tab = "login"; await render(); }
+    if (type === "show-register") { state.tab = "register"; await render(); }
+    if (type === "show-membership") { state.tab = "membership"; await render(); }
     if (type === "back") { state.tab = "audit"; await render(); }
     if (type === "logout") { try { await api("/auth/logout", { method: "POST" }); } finally { localStorage.removeItem(TOKEN_KEY); state.user = null; state.admin = false; state.tab = "audit"; await render(); status("已退出登录。"); } }
-    if (type === "article") { try { const { article } = await api(`/practice/${action.dataset.id}`); const detail = document.getElementById("checkerArticleDetail"); if (detail) { detail.classList.remove("hidden"); detail.innerHTML = `<h2>${escape(article.title)}</h2><p>${escape(article.body).replace(/\n/g, "<br>")}</p>`; detail.scrollIntoView({ behavior: "smooth" }); } } catch (error) { status(error.message, true); } }
-    if (type === "new-article") { document.getElementById("checkerArticleForm")?.reset(); }
-    if (type === "edit-article") { const article = JSON.parse(decodeURIComponent(action.dataset.article)); const form = document.getElementById("checkerArticleForm"); form.elements.id.value = article.id; form.elements.title.value = article.title; form.elements.body.value = article.body; form.elements.status.value = article.status; window.scrollTo({ top: form.getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" }); }
+    if (type === "article") { try { const { article } = await api(`/practice/${action.dataset.id}`); const detail = document.getElementById("checkerArticleDetail"); if (detail) { detail.classList.remove("hidden"); detail.innerHTML = `<h2>${escape(article.title)}</h2><div class="editor-preview practice-markdown">${renderMarkdown(article.body)}</div>`; detail.scrollIntoView({ behavior: "smooth" }); } } catch (error) { status(error.message, true); } }
+    if (type === "new-article") { const form = document.getElementById("checkerArticleForm"); form?.reset(); state.articleEditor?.value(""); }
+    if (type === "edit-article") { const article = JSON.parse(decodeURIComponent(action.dataset.article)); const form = document.getElementById("checkerArticleForm"); form.elements.id.value = article.id; form.elements.title.value = article.title; form.elements.status.value = article.status; state.articleEditor?.value(article.body); window.scrollTo({ top: form.getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" }); }
   });
 
   window.ContentChecker = {
-    async init() { try { await refreshUser(); } catch (error) { status(`审核功能暂不可用：${error.message}`, true); } },
-    async show(tab) { if (tab && tab !== "login") state.tab = tab; await this.init(); await render(); },
+    async init() { try { await refreshUser(); } catch (error) { status(`审核功能暂不可用：${error.message}`, true); } finally { renderAuth(); } },
+    async show(tab) { if (tab) state.tab = tab; await this.init(); await render(); },
     async selectTab(tab) { state.tab = tab || "audit"; await render(); }
   };
 })();
