@@ -2,19 +2,16 @@ const fs = require("fs");
 const path = require("path");
 
 function browserCandidates({
-  env = process.env,
   platform = process.platform,
-  homeDir = env.HOME
+  homeDir = process.env.HOME
 } = {}) {
   const candidates = [];
 
-  if (env.CHROME_PATH) candidates.push(env.CHROME_PATH);
-
   if (platform === "win32") {
     const roots = [
-      env.LOCALAPPDATA,
-      env.PROGRAMFILES,
-      env["PROGRAMFILES(X86)"]
+      process.env.LOCALAPPDATA,
+      process.env.PROGRAMFILES,
+      process.env["PROGRAMFILES(X86)"]
     ].filter(Boolean);
 
     for (const root of roots) {
@@ -54,7 +51,7 @@ function findBrowserExecutable(options) {
   const found = browserCandidates(options).find((candidate) => fs.existsSync(candidate));
   if (!found) {
     throw new Error(
-      "找不到可用的 Chrome、Chromium 或 Edge。请安装 Chrome，或设置环境变量 CHROME_PATH 指向浏览器可执行文件后再运行。"
+      "找不到可用的 Chrome、Chromium 或 Edge。请安装受支持的浏览器后再运行。"
     );
   }
   return found;

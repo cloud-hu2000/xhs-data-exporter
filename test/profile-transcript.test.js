@@ -2,7 +2,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { createProfileTranscriptReader, parseSrt } = require("../src/profile-transcript");
+const { createProfileTranscriptReader, parseSrt, parseSrtCues } = require("../src/profile-transcript");
 
 const sample = `1
 00:00:00,060 --> 00:00:05,210
@@ -17,6 +17,8 @@ assert.equal(
   parseSrt(sample),
   "很多人都觉得gpt deepseek豆包都大差不差不都是一问一答，接下来我将用二游的方式跟你讲解"
 );
+assert.equal(parseSrtCues(sample).length, 2);
+assert.equal(parseSrtCues(sample)[0].startSeconds, 0.06);
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "xhs-profile-transcript-"));
 const noteDir = path.join(root, "profile-exports", "0001-note");
@@ -59,6 +61,8 @@ assert(result);
 assert.equal(result.source, "profile-srt");
 assert(result.transcript.startsWith("很多人都觉得gpt deepseek豆包"));
 assert(result.transcript.includes("一问一答，接下来"));
+assert(result.openingExcerpts[5].startsWith("很多人都觉得"));
+assert(!result.openingExcerpts[5].includes("接下来"));
 const captionResult = reader.get({
   noteKey: "一篇没有字幕的图文",
   title: "一篇没有字幕的图文"

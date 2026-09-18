@@ -35,25 +35,6 @@ function loadConfig() {
   if (process.env.XHS_DEBUG) {
     config.debug = ["1", "true", "yes", "on"].includes(process.env.XHS_DEBUG.toLowerCase());
   }
-  if (process.env.XHS_DEBUG_PORT) {
-    config.debugPort = Number(process.env.XHS_DEBUG_PORT);
-  }
-  if (process.env.XHS_MAX_PAGES) {
-    config.maxPages = Number(process.env.XHS_MAX_PAGES);
-  }
-  if (process.env.XHS_MAX_NOTES) {
-    config.maxNotes = Number(process.env.XHS_MAX_NOTES);
-  }
-  if (process.env.XHS_EXPORT_ALL_BUTTONS) {
-    config.exportAllButtonsInDetail = process.env.XHS_EXPORT_ALL_BUTTONS !== "false";
-  }
-  if (process.env.XHS_EXPORT_RETRY_COUNT) {
-    config.exportRetryCount = Number(process.env.XHS_EXPORT_RETRY_COUNT);
-  }
-  if (process.env.XHS_EXPORT_RETRY_WAIT_MS) {
-    config.exportRetryWaitMs = Number(process.env.XHS_EXPORT_RETRY_WAIT_MS);
-  }
-
   config.downloadDir = path.resolve(projectRoot, config.downloadDir);
   fs.mkdirSync(config.downloadDir, { recursive: true });
 

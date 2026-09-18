@@ -9,7 +9,7 @@ installConsoleLogger();
 
 const projectRoot = path.resolve(__dirname, "..");
 const logsDir = path.join(projectRoot, "logs");
-const dashboardPort = Number(process.env.XHS_DASHBOARD_PORT || 5178);
+const dashboardPort = 5178;
 const dashboardUrl = `http://localhost:${dashboardPort}`;
 
 function printTitle() {
@@ -33,8 +33,8 @@ function run(command, args, options = {}) {
   return result.status ?? 1;
 }
 
-function runNode(script, env = process.env) {
-  return run(process.execPath, [path.join(projectRoot, "src", script)], { env });
+function runNode(script, args = [], env = process.env) {
+  return run(process.execPath, [path.join(projectRoot, "src", script), ...args], { env });
 }
 
 function missingDependencies() {
@@ -121,13 +121,7 @@ async function exportData(maxNotes) {
 
   console.log("");
   console.log(maxNotes === 1 ? "开始测试导出 1 条笔记..." : "开始全量导出...");
-  const env = { ...process.env };
-  if (maxNotes === 1) {
-    env.XHS_MAX_NOTES = "1";
-  } else {
-    delete env.XHS_MAX_NOTES;
-  }
-  return runNode("export-xhs.js", env);
+  return runNode("export-xhs.js", maxNotes === 1 ? ["--max-notes", "1"] : []);
 }
 
 function openUrl(url) {

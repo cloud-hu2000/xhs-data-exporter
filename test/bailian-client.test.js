@@ -1,5 +1,10 @@
 const assert = require("assert");
-const { humanizeStrategyResult, validateRecommendation } = require("../src/bailian-client");
+const {
+  humanizeStrategyResult,
+  normalizeMatchedNoteKeys,
+  normalizeNextContentResult,
+  validateRecommendation
+} = require("../src/bailian-client");
 
 const evidenceCatalog = [
   { id: "note-1.views", text: "测试笔记：观看高，当前值 100，账号中位数 50" }
@@ -164,5 +169,30 @@ assert(!latestLogShape.suggestions[0].data_basis.includes("coverAnalysis"));
 assert(latestLogShape.suggestions[0].data_basis.includes("的【封面点击率】"));
 assert(latestLogShape.suggestions[0].data_basis.includes("的【完播率】"));
 assert(latestLogShape.suggestions[0].data_basis.includes("【封面风险】"));
+
+assert.deepEqual(
+  normalizeMatchedNoteKeys({ matched_note_keys: ["b", "a", "missing", "b", "c"] }, ["a", "b", "c", "d"]),
+  ["b", "a", "c"]
+);
+assert.deepEqual(
+  normalizeMatchedNoteKeys({ matched_note_keys: ["a"] }, ["a", "b", "c", "d"]),
+  ["a", "b", "c", "d"]
+);
+
+const nextContent = normalizeNextContentResult({
+  input_type: "script",
+  optimization_focus: "先给结果",
+  primary_title: "三个方法排完一周选题",
+  alternative_titles: ["标题一", "标题二"],
+  cover_prompt: "竖版封面提示词",
+  opening_hook: "如果你每天不知道拍什么",
+  alternative_hooks: ["开头一", "开头二", "开头三"],
+  content_structure: ["痛点", "方法", "总结"],
+  rewritten_markdown: "## 标题\n\n正文",
+  validation_focus: "opening_retention"
+});
+assert.equal(nextContent.alternativeTitles?.length || nextContent.alternative_titles.length, 0);
+assert.equal(nextContent.alternative_hooks.length, 2);
+assert.throws(() => normalizeNextContentResult({ primary_title: "只有标题" }), /封面提示词/);
 
 console.log("bailian-client tests passed");

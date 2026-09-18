@@ -4,7 +4,7 @@ const { browserCandidates, findBrowserExecutable } = require("../src/browser-pat
 
 const macCandidates = browserCandidates({
   platform: "darwin",
-  env: { HOME: "/Users/tester" }
+  homeDir: "/Users/tester"
 });
 
 assert(macCandidates.includes(
@@ -17,14 +17,8 @@ assert(macCandidates.includes(
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
 ));
 
-const customPath = process.execPath;
-assert.strictEqual(
-  findBrowserExecutable({ env: { CHROME_PATH: customPath }, platform: "darwin" }),
-  customPath
-);
-
 assert.throws(
-  () => findBrowserExecutable({ env: {}, platform: "win32" }),
+  () => findBrowserExecutable({ platform: "win32" }),
   /Chrome、Chromium 或 Edge/
 );
 

@@ -13,6 +13,8 @@ for (const source of ["分享数", "笔记分享数", "转发数", "转发量", 
 assert.equal(resolveMetricField("封面点击率(%)").canonical, "封面点击率");
 assert.equal(resolveMetricField("平均观看时长（s）").canonical, "平均观看时长");
 assert.equal(resolveMetricField(" 2s退出率(%) ").canonical, "2秒退出率");
+assert.equal(resolveMetricField("3s退出率(%)").canonical, "3秒退出率");
+assert.equal(resolveMetricField("5秒退出率（%）").canonical, "5秒退出率");
 assert.equal(resolveMetricField("分享数粉丝占比(%)").canonical, "分享数粉丝占比");
 assert.equal(resolveMetricField("平台新增指标").recognized, false);
 

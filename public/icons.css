@@ -1,0 +1,65 @@
+/* IconPark SVG assets copied locally into public/icons. Masks preserve the surrounding theme color. */
+.app-icon {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask: var(--app-icon) center / contain no-repeat;
+  mask: var(--app-icon) center / contain no-repeat;
+}
+
+.icon-data-screen { --app-icon: url("./icons/data-screen.svg"); }
+.icon-analysis { --app-icon: url("./icons/analysis.svg"); }
+.icon-shield { --app-icon: url("./icons/shield.svg"); }
+.icon-chart-graph { --app-icon: url("./icons/chart-graph.svg"); }
+.icon-data-sheet { --app-icon: url("./icons/data-sheet.svg"); }
+.icon-target { --app-icon: url("./icons/target.svg"); }
+.icon-check { --app-icon: url("./icons/check.svg"); }
+.icon-book { --app-icon: url("./icons/book.svg"); }
+.icon-read-book { --app-icon: url("./icons/read-book.svg"); }
+.icon-settings { --app-icon: url("./icons/settings.svg"); }
+.icon-eyes { --app-icon: url("./icons/eyes.svg"); }
+.icon-play { --app-icon: url("./icons/play.svg"); }
+.icon-like { --app-icon: url("./icons/like.svg"); }
+.icon-edit { --app-icon: url("./icons/edit.svg"); }
+.icon-close { --app-icon: url("./icons/close.svg"); }
+.icon-back { --app-icon: url("./icons/back.svg"); }
+.icon-chevron-down { --app-icon: url("./icons/chevron-down.svg"); }
+.icon-chevron-right { --app-icon: url("./icons/chevron-right.svg"); }
+.icon-upload-computer { --app-icon: url("./icons/upload-computer.svg"); }
+
+.top-menu-icon.app-icon { width: 1rem; height: 1rem; }
+.top-menu-chevron.app-icon { width: .75rem; height: .75rem; }
+.menu-icon.app-icon { width: 1.125rem; height: 1.125rem; }
+.summary-icon.app-icon { width: 2.75rem; height: 2.75rem; padding: .625rem; }
+.review-title-icon.app-icon { width: 2.5rem; height: 2.5rem; padding: .625rem; }
+.modal-close .app-icon { width: 1rem; height: 1rem; }
+.knowledge-modal-close .app-icon { width: 1rem; height: 1rem; }
+.checker-upload-icon.app-icon { width: 1.75rem; height: 1.75rem; }
+.checker-article-back .app-icon { width: 1rem; height: 1rem; margin-right: .375rem; vertical-align: -.125em; }
+.review-dropdown-trigger .app-icon { width: .875rem; height: .875rem; }
+.review-option-check .app-icon { width: .75rem; height: .75rem; }
+.experiment-summary-icon.app-icon { width: 1rem; height: 1rem; }
+
+/* These image icons intentionally do not rely on CSS masking, so they also render in environments that block masks. */
+img.menu-icon.icon-image {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+  object-fit: contain;
+}
+
+.checker-upload-icon .icon-upload-computer-image {
+  display: block;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  filter: invert(39%) sepia(97%) saturate(3074%) hue-rotate(244deg) brightness(97%) contrast(91%);
+}
+
+.checker-upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

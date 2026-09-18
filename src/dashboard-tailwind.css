@@ -1,0 +1,439 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply bg-slate-50; }
+  body { @apply m-0 min-w-[320px] bg-slate-50 font-sans text-slate-800 antialiased; }
+  button, input, select, textarea { font: inherit; }
+  button { @apply disabled:cursor-not-allowed disabled:opacity-50; }
+  :focus-visible { @apply outline-none ring-2 ring-violet-500 ring-offset-2; }
+}
+
+@layer components {
+  .workspace { @apply min-h-screen bg-slate-50; }
+  .app-header { @apply sticky top-0 z-40 flex min-h-[68px] items-center gap-6 border-b border-slate-200 bg-white/95 px-5 shadow-sm backdrop-blur md:px-8; }
+  .brand { @apply flex shrink-0 items-center gap-3; }
+  .brand-mark { @apply grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-200; }
+  .brand-mark span { @apply h-3.5 w-3.5 rounded border-[3px] border-white; }
+  .brand-name { @apply text-sm font-bold tracking-tight text-slate-900; }
+  .brand-sub { @apply mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400; }
+  .top-navigation { @apply flex items-center gap-2; }
+  .top-menu-group { @apply relative; }
+  .top-menu-trigger { @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-violet-50 hover:text-violet-700; }
+  .top-menu-trigger.active { @apply bg-violet-50 text-violet-700; }
+  .top-menu-icon { @apply text-base leading-none; }
+  .top-menu-chevron { @apply text-xs text-slate-400; }
+  .top-menu-panel { @apply absolute left-0 top-[calc(100%+10px)] z-50 grid w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70; }
+  .menu-item { @apply flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-violet-50 hover:text-violet-700; }
+  .menu-item.active { @apply bg-violet-50 text-violet-700; }
+  .menu-icon { @apply grid h-5 w-5 place-items-center text-base; }
+  .checker-auth-slot { @apply ml-auto flex items-center gap-2 text-sm text-slate-500; }
+  .main { @apply mx-auto max-w-[1680px] px-4 py-7 md:px-8; }
+  .main-top { @apply mb-6 flex flex-col gap-4 sm:flex-row sm:items-end; }
+  .main-header-left { @apply flex min-w-0 flex-wrap items-end gap-4 sm:gap-6; }
+  .page-heading { @apply min-w-0; }
+  .heading-row { @apply flex items-center gap-3; }
+  .main-top h1 { @apply m-0 text-2xl font-bold tracking-tight text-slate-900; }
+  .breadcrumb { @apply mt-2 text-sm text-slate-500; }
+  .top-actions { @apply ml-auto flex shrink-0 flex-wrap items-center gap-2; }
+  .toolbar, .page-view-navigation { @apply flex flex-wrap items-center gap-2; }
+  .page-view-navigation { @apply justify-start; }
+  .page-view-navigation .button.active { @apply border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200 hover:border-violet-700 hover:bg-violet-700 hover:text-white; }
+  .button { @apply inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700; }
+  .button.primary { @apply border-violet-600 bg-violet-600 text-white shadow-sm shadow-violet-200 hover:border-violet-700 hover:bg-violet-700 hover:text-white; }
+  .content-card { @apply mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-card md:p-6; }
+  .compact-summary { @apply grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4; }
+  .summary-item { @apply flex min-h-28 items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md; }
+  .summary-icon { @apply grid h-11 w-11 shrink-0 place-items-center rounded-xl text-lg font-bold; }
+  .summary-purple .summary-icon { @apply bg-violet-100 text-violet-700; }
+  .summary-blue .summary-icon { @apply bg-blue-100 text-blue-700; }
+  .summary-green .summary-icon { @apply bg-emerald-100 text-emerald-700; }
+  .summary-pink .summary-icon { @apply bg-rose-100 text-rose-700; }
+  .summary-item > div { @apply grid gap-0.5; }
+  .summary-item span:not(.summary-icon), .summary-item small, .summary-meta, .panel-head p { @apply text-sm text-slate-500; }
+  .summary-item strong { @apply text-2xl font-bold tracking-tight text-slate-900; }
+  .summary-meta { @apply col-span-full border-t border-slate-100 pt-3 text-xs; }
+  .panel-head { @apply mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-start; }
+  .panel-head.tight { @apply mb-4; }
+  .panel-head h2 { @apply m-0 text-lg font-bold text-slate-900; }
+  .panel-head p { @apply mt-1.5 max-w-4xl leading-6; }
+  .search-input, .select-input, .page-size-select, .review-custom-input, .review-text-input, .review-textarea { @apply block rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-200; }
+  .search-input { @apply min-w-52; }
+  .select-input { @apply pr-8; }
+  .wide-select { @apply min-w-60; }
+  .segmented { @apply mb-5 flex flex-wrap gap-2; }
+  .segmented button, .checker-tab { @apply rounded-full bg-slate-100 px-3.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-violet-100 hover:text-violet-700; }
+  .segmented button.active, .checker-tab.active { @apply bg-violet-600 text-white hover:bg-violet-700 hover:text-white; }
+  .chart-layout { @apply grid gap-5; }
+  .publish-layout, .funnel-layout, .cover-layout { @apply grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]; }
+  .lifecycle-chart, .publish-heatmap, .funnel-chart, .cover-chart { @apply h-[340px] min-w-0; }
+  .table-wrap { @apply overflow-x-auto rounded-lg border border-slate-200; }
+  .data-table { @apply w-full min-w-max border-collapse text-left text-sm text-slate-600; }
+  .data-table th { @apply whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .data-table th[data-sort-key] { @apply cursor-pointer select-none hover:bg-violet-50 hover:text-violet-700; }
+  .data-table th.sorted { @apply bg-violet-50 text-violet-700; }
+  .data-table td { @apply border-b border-slate-100 px-4 py-3 align-middle; }
+  .data-table tbody tr { @apply transition hover:bg-slate-50; }
+  .data-table tbody tr:last-child td { @apply border-b-0; }
+  .sort-indicator { @apply ml-1 text-violet-500; }
+  .pagination-bar { @apply mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500; }
+  .pagination-controls { @apply flex flex-wrap items-center gap-2; }
+  .pagination-controls label { @apply flex items-center gap-2; }
+  .page-button { @apply px-3 py-1.5; }
+  .page-current { @apply px-2 text-sm text-slate-500; }
+  .note-title { @apply max-w-64 font-medium text-slate-800; }
+  .note-sub, .metric-sub { @apply mt-0.5 text-xs text-slate-400; }
+  .metric-main { @apply font-semibold tabular-nums text-slate-800; }
+  .tags { @apply flex max-w-56 flex-wrap gap-1.5; }
+  .tag, .median-sample, .ai-status, .risk-badge { @apply inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600; }
+  .tag.strong { @apply bg-violet-100 text-violet-700; }
+  .tag.warning, .ai-status.warning { @apply bg-amber-100 text-amber-700; }
+  .warn-value, .warn-sub { @apply text-amber-600; }
+  .muted-value, .analysis-muted { @apply text-slate-400; }
+  .modal-open { @apply overflow-hidden; }
+  .modal-backdrop { @apply fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm; }
+  .note-review-card { @apply flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl; }
+  .note-review-head { @apply flex items-start gap-3 border-b border-slate-200 p-5; }
+  .review-title-icon { @apply grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-violet-100 text-violet-700; }
+  .modal-eyebrow, .panel-kicker { @apply text-xs font-bold uppercase tracking-widest text-violet-600; }
+  .note-review-head h3 { @apply m-1 text-lg font-bold text-slate-900; }
+  .note-review-head p, .note-review-progress { @apply m-0 text-sm leading-5 text-slate-500; }
+  .modal-close { @apply ml-auto grid h-8 w-8 place-items-center rounded-lg text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700; }
+  .note-review-selector { @apply border-b border-slate-100 p-5; }
+  .note-review-selector label, .review-dropdown-field > label, .note-review-details label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
+  .note-review-scroll { @apply overflow-y-auto p-5; }
+  .note-review-footer { @apply flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 px-5; }
+  .note-review-footer-actions { @apply flex gap-2; }
+  .review-form-section { @apply mb-6; }
+  .review-form-section > h4 { @apply mb-3 flex items-center gap-2 text-sm font-bold text-slate-800; }
+  .review-form-section > h4::before { content: ""; @apply h-4 w-1 rounded-full bg-violet-500; }
+  .review-dropdown-grid, .note-review-details { @apply grid gap-4 md:grid-cols-2; }
+  .review-dropdown-field { @apply relative; }
+  .review-dropdown-trigger { @apply flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 hover:border-violet-300; }
+  .review-dropdown-trigger .placeholder { @apply text-slate-400; }
+  .review-dropdown-menu { @apply absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 shadow-lg; }
+  .review-dropdown-options { @apply grid max-h-44 gap-1 overflow-auto; }
+  .review-dropdown-option { @apply flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-violet-50; }
+  .review-dropdown-option.selected { @apply bg-violet-50 text-violet-700; }
+  .review-option-check { @apply grid h-4 w-4 place-items-center rounded border border-violet-300 text-xs; }
+  .review-custom-row { @apply mt-2 flex gap-2 border-t border-slate-100 pt-2; }
+  .review-custom-input { @apply min-w-0 flex-1 py-1.5; }
+  .review-wide-field { @apply md:col-span-2; }
+  .review-text-input, .review-textarea { @apply mt-1 w-full; }
+  .review-textarea { @apply resize-y leading-6; }
+  .review-flags { @apply mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600; }
+  .review-flags label { @apply flex items-center gap-2; }
+  .review-flags input { @apply h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500; }
+  .cover-table img, .cover-placeholder { @apply h-10 w-10 rounded-lg object-cover; }
+  .cover-placeholder { @apply grid place-items-center bg-violet-100 text-xs font-bold text-violet-700; }
+  .cover-ai-panel, .strategy-input-card, .strategy-facts-card, .strategy-cover-card, .strategy-result-card { @apply mb-5 rounded-xl border border-slate-200 bg-slate-50/60 p-5; }
+  .empty-analysis { @apply py-4 text-sm text-slate-400; }
+  .strategy-workspace { @apply grid gap-5 xl:grid-cols-2; }
+  .strategy-cover-card, .strategy-result-card { @apply xl:col-span-2; }
+  .strategy-section-head { @apply mb-4 flex flex-wrap items-start justify-between gap-3; }
+  .strategy-section-head h3 { @apply m-0 text-base font-bold text-slate-800; }
+  .strategy-section-head p { @apply mt-1 text-sm leading-5 text-slate-500; }
+  .strategy-input-card label { @apply mb-4 block text-sm font-medium text-slate-700; }
+  .strategy-input-card textarea { @apply mt-1 w-full; }
+  .fact-grid { @apply grid gap-3 sm:grid-cols-2; }
+  .fact-card { @apply rounded-lg border border-slate-200 bg-white p-3; }
+  .fact-card.fact-strong { @apply border-emerald-200 bg-emerald-50; }
+  .fact-card.fact-risk { @apply border-amber-200 bg-amber-50; }
+  .fact-card span, .fact-card small { @apply block text-xs text-slate-500; }
+  .fact-card strong { @apply mt-1 block text-sm text-slate-800; }
+  .cover-analysis-grid { @apply grid gap-4 md:grid-cols-[160px_1fr]; }
+  .analysis-cover-image { @apply h-32 w-full rounded-lg object-cover; }
+  .analysis-definition-list, .suggestion-card dl, .experiment-definition-list { @apply grid gap-2; }
+  .analysis-definition-list > div, .suggestion-card dl > div, .experiment-definition-list > div { @apply grid grid-cols-[100px_1fr] gap-3 text-sm; }
+  .analysis-definition-list dt, .suggestion-card dt, .experiment-definition-list dt { @apply text-slate-500; }
+  .analysis-definition-list dd, .suggestion-card dd, .experiment-definition-list dd { @apply m-0 text-slate-700; }
+  .analysis-meta { @apply mt-3 text-xs text-slate-400; }
+  .cover-analysis-markdown { @apply text-sm leading-6 text-slate-700; }
+  .cover-analysis-markdown h2 { @apply mb-1 mt-0 text-sm font-bold text-slate-900; }
+  .cover-analysis-markdown h2 + ul { @apply mt-0; }
+  .cover-analysis-markdown ul { @apply mb-4 mt-1 grid gap-1 pl-5; }
+  .cover-analysis-markdown li::marker { @apply text-violet-500; }
+  .strategy-result { @apply grid gap-4; }
+  .strategy-conclusion { @apply rounded-lg border border-violet-100 bg-violet-50 p-4; }
+  .strategy-conclusion.priority { @apply border-amber-200 bg-amber-50; }
+  .strategy-eyebrow, .suggestion-label, .experiment-status { @apply text-xs font-bold uppercase tracking-wide text-violet-600; }
+  .suggestion-grid { @apply grid gap-4 lg:grid-cols-3; }
+  .suggestion-card, .experiment-card { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm; }
+  .suggestion-card-head, .experiment-card-head { @apply flex items-start justify-between gap-3; }
+  .experiment-lab { @apply grid gap-3; }
+  .experiment-card-summary { @apply flex w-full items-center justify-between gap-3 text-left; }
+  .experiment-summary-main, .experiment-summary-meta { @apply flex items-center gap-3; }
+  .experiment-summary-title { @apply font-semibold text-slate-800; }
+  .experiment-card-detail { @apply hidden border-t border-slate-100 pt-4; }
+  .experiment-card.is-expanded .experiment-card-detail { @apply mt-4 block; }
+  .experiment-status.verified { @apply text-emerald-600; }
+  .experiment-match-panel { @apply mt-4 flex flex-wrap items-end gap-3; }
+  .experiment-match-panel label { @apply grid gap-1 text-sm text-slate-600; }
+  .experiment-verification { @apply mt-4 rounded-lg bg-emerald-50 p-3; }
+  .experiment-metrics { @apply mt-2 grid grid-cols-2 gap-2 text-sm; }
+  .experiment-metrics div { @apply rounded bg-white p-2; }
+  .experiment-metrics span { @apply block text-xs text-slate-500; }
+  .experiment-metrics strong { @apply text-slate-800; }
+  .median-row td { @apply bg-violet-50/70 font-medium; }
+
+  .next-content-page { @apply mx-auto max-w-6xl p-0 md:p-0; }
+  .next-content-hero { @apply border-b border-slate-100 px-8 py-7; }
+  .next-content-hero h2 { @apply mb-0 mt-2 text-2xl font-bold tracking-tight text-slate-900; }
+  .next-content-hero p { @apply mb-0 mt-2 text-sm text-slate-500; }
+  .next-content-unavailable { @apply m-8 flex items-center gap-5 rounded-xl border border-amber-200 bg-amber-50 p-6; }
+  .next-content-unavailable h3 { @apply m-0 text-base font-bold text-slate-900; }
+  .next-content-unavailable p { @apply mb-0 mt-1 text-sm text-slate-600; }
+  .next-content-unavailable .button { @apply ml-auto shrink-0; }
+  .next-content-lock { @apply grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-100 text-lg font-bold text-amber-700; }
+  .next-content-composer { @apply m-8 rounded-xl border border-slate-200 bg-slate-50/60 p-6; }
+  .next-content-composer > label { @apply mb-2 flex items-center justify-between text-sm font-bold text-slate-800; }
+  .next-content-composer > label small { @apply font-normal text-slate-400; }
+  .next-content-composer textarea { @apply min-h-[320px] w-full resize-y rounded-xl border border-slate-300 bg-white p-4 text-sm leading-7 text-slate-800 placeholder-slate-400 transition focus:border-violet-500 focus:ring-2 focus:ring-violet-200; }
+  .next-content-composer-footer { @apply mt-4 flex items-center justify-between gap-4; }
+  .next-content-composer-footer p { @apply m-0 text-xs text-slate-400; }
+  .strategy-action-status { @apply mt-3 min-h-5 text-sm text-slate-500; }
+  .next-content-result { @apply grid gap-5 p-8; }
+  .next-content-result-topbar { @apply flex items-center justify-between; }
+  .next-content-save-status { @apply text-xs text-slate-400; }
+  .next-content-focus { @apply rounded-xl border border-violet-200 bg-violet-50 p-5; }
+  .next-content-focus span { @apply text-xs font-bold uppercase tracking-widest text-violet-600; }
+  .next-content-focus h3 { @apply mb-0 mt-2 text-lg font-bold leading-7 text-slate-900; }
+  .next-content-output-grid { @apply grid gap-5 lg:grid-cols-2; }
+  .next-content-output-card { @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  .next-content-copy-card { @apply lg:col-span-2; }
+  .next-content-card-head { @apply mb-4 flex items-start justify-between gap-4; }
+  .next-content-card-head h3 { @apply m-0 text-base font-bold text-slate-900; }
+  .next-content-card-head > div > p { @apply mb-0 mt-1; }
+  .next-content-prompt { @apply rounded-lg bg-slate-50 p-4 text-sm leading-7 text-slate-700; }
+  .next-content-opening { @apply m-0 text-sm leading-7 text-slate-700; }
+  .next-content-alternatives { @apply mt-4 grid grid-cols-2 gap-3; }
+  .next-content-alternatives > div { @apply rounded-lg bg-slate-50 p-3; }
+  .next-content-alternatives span { @apply text-xs font-semibold text-violet-600; }
+  .next-content-alternatives p { @apply mb-0 mt-1 text-sm leading-6 text-slate-600; }
+  .next-content-structure { @apply text-xs leading-5 text-slate-400; }
+  .next-content-markdown { @apply min-h-[260px] rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-5 text-sm leading-7 text-slate-700 transition focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100; }
+  .next-content-markdown h1 { @apply mb-4 mt-0 text-xl font-bold text-slate-900; }
+  .next-content-markdown h2 { @apply mb-3 mt-6 text-lg font-bold text-slate-900; }
+  .next-content-markdown h3 { @apply mb-2 mt-5 text-base font-bold text-slate-800; }
+  .next-content-markdown p { @apply my-3; }
+  .next-content-markdown ul, .next-content-markdown ol { @apply my-3 pl-6; }
+  .next-content-markdown ul { @apply list-disc; }
+  .next-content-markdown ol { @apply list-decimal; }
+  .next-content-evidence { @apply rounded-xl border border-slate-200 bg-white; }
+  .next-content-evidence > summary { @apply cursor-pointer px-5 py-4 text-sm font-semibold text-slate-600; }
+  .next-content-evidence-body { @apply grid gap-5 border-t border-slate-100 p-5 lg:grid-cols-3; }
+  .next-content-reference-section h4 { @apply m-0 text-sm font-bold text-slate-800; }
+  .next-content-reference-group { @apply mt-3; }
+  .next-content-reference-group > span { @apply text-xs font-semibold text-emerald-600; }
+  .next-content-reference-group.weak > span { @apply text-xs text-amber-600; }
+  .next-content-reference-group > div { @apply mt-2 grid gap-2; }
+  .next-content-reference-card { @apply flex items-center gap-3 rounded-lg bg-slate-50 p-2; }
+  .next-content-reference-card img, .next-content-reference-placeholder { @apply h-10 w-10 shrink-0 rounded-lg object-cover; }
+  .next-content-reference-placeholder { @apply grid place-items-center bg-slate-200 text-[10px] text-slate-500; }
+  .next-content-reference-card span { @apply text-xs leading-5 text-slate-600; }
+  .next-content-result-actions { @apply flex flex-wrap justify-between gap-3; }
+  .creation-plan-card { @apply flex items-center justify-between gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  .creation-plan-card h3 { @apply mb-0 mt-2 text-base font-bold text-slate-900; }
+  .creation-plan-card p { @apply mb-0 mt-1 text-sm text-slate-500; }
+  .creation-plan-card-meta { @apply flex shrink-0 items-center gap-4 text-xs text-slate-400; }
+
+  /* Flowbite-compatible content checker screens rendered dynamically. */
+  .checker-panel { @apply overflow-visible; }
+  .checker-header, .checker-page-head, .checker-form-head, .checker-hero, .checker-result { @apply flex flex-wrap items-center justify-between gap-5; }
+  .checker-header { @apply border-b border-slate-200 pb-5; }
+  .checker-header h2, .checker-page-head h3, .checker-hero h3 { @apply m-0 font-bold text-slate-900; }
+  .checker-header p, .checker-page-head p, .checker-hero p { @apply m-0 text-sm leading-6 text-slate-500; }
+  .checker-tabs { @apply flex flex-wrap gap-2 py-5; }
+  .checker-status { @apply mb-3 min-h-5 text-sm text-emerald-700; }
+  .checker-status.error { @apply text-rose-600; }
+  .checker-hero { @apply rounded-xl bg-gradient-to-r from-violet-50 to-rose-50 p-6; }
+  .checker-demo-card { @apply grid min-w-52 gap-2 rounded-xl bg-white p-5 shadow-card; }
+  .checker-demo-card b, .checker-demo-card span { @apply text-xs text-slate-500; }
+  .checker-demo-card strong { @apply text-lg text-slate-800; }
+  .checker-form, .checker-result { @apply mt-5 rounded-xl border border-slate-200 bg-white p-5; }
+  .checker-form-head { @apply mb-4; }
+  .checker-form-head h3 { @apply m-0 font-bold text-slate-800; }
+  .checker-form-head label, .checker-form label, .checker-auth-form label { @apply grid gap-1.5 text-sm font-medium text-slate-700; }
+  .checker-form-grid, .checker-admin-grid { @apply grid gap-5 lg:grid-cols-2; }
+  .checker-form input, .checker-form textarea, .checker-form select, .checker-auth-form input, .checker-page-head input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-violet-500 focus:ring-violet-200; }
+  .checker-form textarea { @apply min-h-56 resize-y leading-6; }
+  .checker-form small { @apply text-xs font-normal text-slate-400; }
+  .checker-previews { @apply grid grid-cols-6 gap-2; }
+  .checker-previews img { @apply aspect-square w-full rounded-md object-cover; }
+  .checker-disclaimer { @apply text-xs leading-5 text-slate-400; }
+  .checker-result { @apply items-start; }
+  .checker-score { @apply grid h-20 w-20 place-items-center rounded-full border-8 border-blue-100 text-blue-700; }
+  .checker-score.risk-HIGH { @apply border-rose-200 text-rose-600; }
+  .checker-score.risk-MEDIUM { @apply border-amber-200 text-amber-700; }
+  .checker-score strong { @apply text-2xl; }
+  .checker-score span { @apply text-[10px]; }
+  .risk-HIGH { @apply bg-rose-100 text-rose-700; }
+  .risk-MEDIUM { @apply bg-amber-100 text-amber-700; }
+  .risk-LOW { @apply bg-blue-100 text-blue-700; }
+  .risk-TIP { @apply bg-violet-100 text-violet-700; }
+  .checker-result > div:nth-child(2) { @apply min-w-56 flex-1; }
+  .checker-result h3 { @apply my-2 font-bold text-slate-800; }
+  .checker-result p, .checker-result-summary { @apply m-0 text-sm leading-6 text-slate-500; }
+  .checker-issue-list { @apply grid w-full gap-3; }
+  .checker-issue { @apply grid grid-cols-[auto_1fr] gap-3 rounded-lg border border-slate-200 p-3; }
+  .checker-suggestion { @apply font-medium text-slate-700 !important; }
+  .checker-evidence { @apply w-full; }
+  .checker-evidence > div { @apply grid gap-3 md:grid-cols-3; }
+  .checker-evidence-image { @apply m-0 text-xs text-slate-500; }
+  .checker-evidence-image > div { @apply relative overflow-hidden rounded-lg; }
+  .checker-evidence-image img { @apply block aspect-square w-full object-cover; }
+  .checker-evidence-image i { @apply absolute border-2 border-rose-500 bg-rose-100/30; }
+  .checker-page-head { @apply border-b border-slate-100 pb-4; }
+  .checker-page-head form { @apply flex gap-2; }
+  .checker-history { @apply grid gap-3; }
+  .checker-history details { @apply overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm transition hover:border-violet-300; }
+  .checker-history details[open] { @apply border-violet-300; }
+  .checker-history summary { @apply grid cursor-pointer grid-cols-[1.5fr_.5fr_.7fr_.9fr] gap-3 border-b border-slate-200 p-4 text-sm; }
+  .checker-history details:not([open]) summary { @apply border-b-0; }
+  .checker-history-detail { @apply bg-slate-50 p-4; }
+  .checker-history-detail article { @apply mt-2 rounded-lg border border-slate-200 bg-white p-3; }
+  .checker-knowledge { @apply grid gap-4 md:grid-cols-2; }
+  .checker-knowledge article, .checker-plans article { @apply rounded-xl border border-slate-200 bg-white p-5; }
+  .checker-knowledge span, .checker-articles span, .checker-admin-list span { @apply text-xs font-semibold text-violet-600; }
+  .checker-knowledge h3 { @apply mb-2 mt-3 font-bold text-slate-800; }
+  .checker-knowledge p { @apply text-sm leading-6 text-slate-500; }
+  .checker-articles, .checker-admin-list { @apply grid gap-3; }
+  .checker-articles button, .checker-admin-list button { @apply grid w-full gap-1 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-violet-300 hover:bg-violet-50; }
+  .checker-articles h3 { @apply m-0 font-semibold text-slate-800; }
+  .checker-article-detail { @apply mt-5 rounded-xl bg-slate-50 p-6 leading-7; }
+  .checker-plans { @apply grid gap-4 lg:grid-cols-3; }
+  .checker-plans article { @apply grid min-h-64 content-start gap-3; }
+  .checker-plans article.active { @apply border-violet-400 ring-4 ring-violet-100; }
+  .checker-plans h3, .checker-plans p { @apply m-0; }
+  .checker-plans strong { @apply text-3xl text-slate-800; }
+  .checker-plans small { @apply text-xs font-normal text-slate-400; }
+  .checker-login-required, .checker-auth-form { @apply mx-auto my-8 grid max-w-md justify-items-start gap-3 rounded-xl border border-slate-200 bg-white p-6; }
+  .checker-login-required { @apply justify-items-center text-center; }
+  .checker-login-required h3, .checker-auth-form h3 { @apply m-0 font-bold text-slate-800; }
+  .checker-auth-form label { @apply w-full; }
+  .checker-auth-form > div, .checker-form-actions { @apply flex flex-wrap gap-2; }
+  .checker-empty { @apply p-5 text-center text-sm text-slate-400; }
+  .markdown-editor { @apply overflow-hidden rounded-lg border border-slate-200 bg-white; }
+  .markdown-editor-toolbar { @apply flex min-h-10 items-center gap-1 border-b border-slate-200 bg-slate-50 p-1; }
+  .markdown-editor-panes { @apply grid min-h-96 md:grid-cols-2; }
+  .markdown-editor-preview { @apply border-l border-slate-200 bg-slate-50; }
+  .markdown-editor-pane-title { @apply px-3 pt-3 text-xs font-bold uppercase tracking-wide text-slate-400; }
+  .markdown-editor-input, .markdown-rendered { @apply box-border h-96 w-full p-3 text-sm leading-6; }
+  .markdown-editor-input { @apply resize-none border-0 bg-transparent font-mono outline-none; }
+  .markdown-rendered { @apply overflow-auto; }
+  .practice-markdown { @apply text-slate-700; }
+  .practice-markdown h1, .practice-markdown h2, .practice-markdown h3 { @apply font-bold text-slate-900; }
+  .practice-markdown a { @apply text-violet-700 underline; }
+  .practice-markdown pre { @apply overflow-auto rounded-lg bg-slate-900 p-4 text-slate-100; }
+  .practice-markdown code { @apply rounded bg-violet-100 px-1 py-0.5 text-violet-800; }
+  .practice-markdown table { @apply w-full border-collapse; }
+  .practice-markdown th, .practice-markdown td { @apply border border-slate-200 p-2 text-left; }
+  .practice-markdown th { @apply bg-slate-100; }
+
+  /* Knowledge base and practice-library layouts mirror the standalone content-checker pages. */
+  .checker-knowledge-hero, .checker-practice-hero { @apply -mx-4 -mt-1 overflow-hidden border-b border-[#eeebf5] px-4 py-14 sm:-mx-8 sm:px-8 sm:py-[72px]; }
+  .checker-knowledge-hero { background: radial-gradient(circle at 78% 28%, rgba(225, 216, 255, .75), transparent 25rem), linear-gradient(135deg, #f6f4ff 0%, #fff9fa 100%); }
+  .checker-practice-hero { background: radial-gradient(circle at 80% 20%, rgba(229, 220, 255, .85), transparent 22rem), linear-gradient(135deg, #f8f7ff, #fffafb); }
+  .checker-knowledge-hero > div, .checker-practice-hero > div { @apply mx-auto max-w-2xl; }
+  .checker-knowledge-hero h2, .checker-practice-hero h2 { @apply m-0 text-4xl font-bold tracking-[-.055em] text-[#25213b] sm:text-[52px]; }
+  .checker-knowledge-hero p, .checker-practice-hero p { @apply mt-4 max-w-xl text-sm leading-7 text-[#716b82] sm:text-base; }
+  .checker-knowledge-hero .button { @apply mt-6; }
+  .checker-practice-hero > div > span, .checker-article-page > article > span { @apply text-xs font-extrabold uppercase tracking-[.14em] text-violet-600; }
+  .checker-practice-hero h2 { @apply mt-3; }
+  .checker-practice-hero form { @apply mt-7 flex max-w-xl gap-2; }
+  .checker-practice-hero input { @apply min-w-0 flex-1 rounded-[14px] border border-[#ded9ef] bg-white px-3.5 py-3 text-sm text-[#26233b] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200; }
+  .checker-knowledge { @apply mx-auto grid max-w-6xl gap-5 py-12 lg:grid-cols-2; }
+  .knowledge-card { @apply overflow-hidden rounded-[20px] border border-[#ebe7f3] bg-white p-[26px] shadow-[0_10px_30px_rgba(68,55,112,.045)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_rgba(68,55,112,.09)]; }
+  .knowledge-card-top { @apply flex items-start justify-between gap-4; }
+  .checker-knowledge .knowledge-number { @apply text-[34px] font-extrabold leading-none tracking-[-.06em] text-[#d8d1f8]; }
+  .checker-knowledge .knowledge-category { @apply rounded-full bg-[#f2efff] px-2.5 py-[5px] text-xs font-bold text-[#6958dd]; }
+  .knowledge-card h3 { @apply mb-0 mt-7 text-[22px] font-bold leading-8 tracking-[-.03em] text-[#302c45]; }
+  .knowledge-card p { @apply mb-0 mt-3 text-sm leading-7 text-[#716b82]; }
+  .knowledge-divider { @apply my-6 h-px bg-[#eeebf5]; }
+  .knowledge-card > b { @apply text-xs font-extrabold tracking-[.12em] text-[#7667e8]; }
+  .knowledge-card ul { @apply mb-0 mt-3 grid gap-2.5 p-0 text-sm leading-6 text-[#5f596e]; }
+  .knowledge-card li { @apply relative list-none pl-5; }
+  .knowledge-card li::before { content: ""; @apply absolute left-0 top-2 h-2 w-2 rounded-full bg-[#8c7ff0] ring-4 ring-[#f1efff]; }
+  .checker-knowledge-link { @apply text-[#6857e8] underline underline-offset-4; }
+  .knowledge-modal-backdrop { @apply fixed inset-0 z-[60] flex items-center justify-center bg-[#26233b]/40 p-5; }
+  .knowledge-modal { @apply max-h-[calc(100vh-40px)] w-full max-w-[680px] overflow-auto rounded-[22px] border border-[#ebe7f3] bg-white p-7 shadow-2xl; }
+  .knowledge-modal-head { @apply flex items-start justify-between gap-5; }
+  .knowledge-modal h2 { @apply m-0 text-2xl font-bold tracking-[-.04em] text-[#302c45]; }
+  .knowledge-modal-close { @apply grid h-[34px] w-[34px] place-items-center rounded-full bg-[#f6f4fb] p-0 text-[25px] leading-none text-[#665f79] hover:bg-[#ede9fb] hover:text-[#4e3fd0]; }
+  .knowledge-modal label { @apply mt-6 block text-sm font-bold text-[#4c465e]; }
+  .knowledge-prompt-input { @apply mt-2 block min-h-32 w-full resize-y rounded-xl border border-[#ded9ef] bg-white p-3.5 text-sm leading-7 text-[#494258] outline-none focus:border-[#8272ed] focus:ring-2 focus:ring-[#7667ee]/20; }
+  .knowledge-modal-actions { @apply mt-5 flex flex-wrap items-center justify-between gap-3; }
+  .knowledge-modal-actions p { @apply m-0 min-h-5 text-sm text-[#716b82]; }
+  .knowledge-modal-actions > div { @apply flex gap-3; }
+  .checker-practice-list { @apply mx-auto max-w-5xl py-10 sm:py-14; }
+  .checker-practice-list-head { @apply mb-6 flex items-center justify-between gap-4 text-sm text-[#7f7b93]; }
+  .checker-practice-list-head p { @apply m-0; }
+  .checker-articles { @apply grid gap-4; }
+  .checker-articles button { @apply grid w-full gap-3 rounded-[18px] border border-[#ebe7f3] bg-white p-6 text-left shadow-[0_10px_30px_rgba(68,55,112,.045)] transition hover:-translate-y-0.5 hover:border-[#ebe7f3] hover:bg-white hover:shadow-[0_16px_35px_rgba(68,55,112,.09)]; }
+  .checker-articles h3 { @apply m-0 text-xl font-bold tracking-[-.025em] text-[#302c45]; }
+  .checker-articles span { @apply text-sm font-normal text-[#827b91]; }
+  .checker-article-page { @apply mx-auto max-w-5xl py-10 sm:py-14; }
+  .checker-article-back { @apply text-sm font-semibold text-[#6857e8]; }
+  .checker-article-page > article { @apply mx-auto mt-7 max-w-3xl rounded-[22px] border border-[#ebe7f3] bg-white p-6 shadow-[0_10px_30px_rgba(68,55,112,.045)] sm:p-10; }
+  .checker-article-page h2 { @apply mb-0 mt-3 text-3xl font-bold leading-tight tracking-[-.04em] text-[#25213b] sm:text-[42px]; }
+  .checker-article-date { @apply mb-0 mt-4 border-b border-[#eeeaf5] pb-7 text-sm text-[#827b91]; }
+  .checker-article-page .practice-markdown { @apply pt-3 text-base leading-[1.85] text-[#4c465d]; }
+  .checker-article-page .practice-markdown h1, .checker-article-page .practice-markdown h2, .checker-article-page .practice-markdown h3 { @apply my-7 font-bold leading-[1.3] tracking-[-.025em] text-[#29233d]; }
+  .checker-article-page .practice-markdown h1 { @apply text-[1.8em]; }
+  .checker-article-page .practice-markdown h2 { @apply text-[1.45em]; }
+  .checker-article-page .practice-markdown h3 { @apply text-[1.2em]; }
+  .checker-article-page .practice-markdown p, .checker-article-page .practice-markdown ul, .checker-article-page .practice-markdown ol, .checker-article-page .practice-markdown blockquote { @apply my-[.9em]; }
+  .checker-article-page .practice-markdown ul, .checker-article-page .practice-markdown ol { @apply pl-6; }
+  .checker-article-page .practice-markdown li + li { @apply mt-1.5; }
+  .checker-article-page .practice-markdown blockquote { @apply border-l-[3px] border-[#9d90ee] pl-4 text-[#675f78]; }
+  .checker-article-page .practice-markdown strong { @apply text-[#342c4c]; }
+  .checker-article-page .practice-markdown code { @apply bg-[#f2effa] text-inherit; }
+  .checker-article-page .practice-markdown pre { @apply rounded-xl bg-[#28243a] text-[#f5f2ff]; }
+
+  /* Responsive audit workspace. */
+  .checker-audit-form { @apply mx-auto mt-0 max-w-[1440px] rounded-2xl border-slate-200 p-5 shadow-[0_12px_34px_rgba(30,41,59,.05)] sm:p-7; }
+  .checker-audit-form-head { @apply mb-6 flex flex-wrap items-start justify-between gap-5 border-b border-slate-100 pb-5; }
+  .checker-audit-form-head h3 { @apply m-0 text-xl font-bold tracking-tight text-slate-900; }
+  .checker-audit-form-head p { @apply mb-0 mt-1.5 text-sm leading-6 text-slate-500; }
+  .checker-audit-imported { @apply mt-2 !text-emerald-700; }
+  .checker-platform-field { @apply grid min-w-[154px] gap-1.5 text-sm font-semibold text-slate-700; }
+  .checker-audit-form .checker-platform-select { @apply min-w-[154px] appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-9 text-sm font-semibold text-slate-800 shadow-sm transition focus:border-violet-500 focus:ring-2 focus:ring-violet-200; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6.5 7.5 3.5 3.5 3.5-3.5' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E"); background-position: right 10px center; background-repeat: no-repeat; background-size: 18px; }
+  .checker-audit-grid { @apply grid gap-7 lg:grid-cols-[minmax(0,.92fr)_minmax(0,1.08fr)]; }
+  .checker-audit-column { @apply flex min-w-0 flex-col; }
+  .checker-audit-form .checker-field-label { @apply mb-1.5 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700; }
+  .checker-audit-form .checker-field-label small { @apply text-xs font-normal text-slate-400; }
+  .checker-audit-form input:not(.checker-file-input), .checker-audit-form textarea { @apply rounded-xl border-slate-300 bg-slate-50/70 px-3.5 py-3 shadow-none focus:bg-white; }
+  .checker-upload-field { @apply mt-5; }
+  .checker-file-input { @apply sr-only; }
+  .checker-upload-dropzone { @apply mt-1 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 px-5 py-7 text-center text-slate-500 transition hover:border-violet-400 hover:bg-violet-50/50; }
+  .checker-upload-dropzone.is-dragging { @apply border-violet-500 bg-violet-50 ring-4 ring-violet-100; }
+  .checker-upload-dropzone.has-files { @apply min-h-32 border-violet-300 bg-violet-50/30; }
+  .checker-upload-icon { @apply mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 text-violet-600 shadow-sm; }
+  .checker-upload-icon svg { @apply h-7 w-7; }
+  .checker-upload-dropzone strong { @apply text-sm font-semibold text-slate-700; }
+  .checker-upload-dropzone > span:last-child { @apply mt-1.5 text-xs text-slate-400; }
+  .checker-audit-form .checker-previews { @apply mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6; }
+  .checker-audit-form .checker-previews:empty { @apply hidden; }
+  .checker-audit-form .checker-previews img { @apply aspect-square rounded-xl border border-slate-200 object-cover shadow-sm; }
+  .checker-audit-copy textarea { @apply min-h-[338px] flex-1 resize-y leading-7; }
+  .checker-audit-actions { @apply mt-4 flex flex-wrap items-center justify-between gap-4; }
+  .checker-audit-actions .checker-disclaimer { @apply m-0 max-w-xl text-xs leading-5 text-slate-400; }
+  @media (max-width: 1023px) { .checker-audit-copy textarea { @apply min-h-64; } }
+  @media (max-width: 639px) { .checker-audit-form { @apply p-4; } .checker-audit-form-head { @apply gap-4; } .checker-platform-field, .checker-audit-form .checker-platform-select { @apply w-full; } .checker-upload-dropzone { @apply min-h-48; } .checker-audit-actions { @apply items-stretch; } .checker-audit-actions .button { @apply w-full; } }
+}
+
+@layer utilities {
+  .hidden { display: none !important; }
+}
+
+@media (max-width: 768px) {
+  .app-header { @apply flex-wrap gap-3 py-3; }
+  .top-navigation { @apply order-3 w-full; }
+  .checker-auth-slot { @apply ml-auto; }
+  .main { @apply py-5; }
+  .data-table th, .data-table td { @apply px-3 py-2.5; }
+  .checker-history summary { @apply grid-cols-1; }
+  .checker-page-head form { @apply w-full; }
+  .checker-page-head input { @apply min-w-0; }
+}

@@ -13,6 +13,8 @@ const state = {
   notesCompareTag: "all",
   strategyNoteKey: "",
   strategyPayload: null,
+  nextContentPlan: null,
+  nextContentSaveTimer: null,
   expandedExperiments: new Set(),
   coverAiNoteKey: "",
   reviewNoteKey: "",
@@ -76,25 +78,26 @@ const REVIEW_FIELD_GROUPS = [
 ];
 
 const VIEW_META = {
-  lifecycle: ["数据看板 / 生命周期对比", "笔记生命周期对比"],
-  publish: ["数据看板 / 发布时间分析", "发布时间分析"],
-  funnel: ["数据看板 / 内容诊断", "分叉式内容诊断"],
-  cover: ["数据看板 / 封面分析", "封面分析"],
-  notes: ["数据看板 / 数据总览", "数据总览"],
-  strategy: ["数据看板 / 下一条怎么做", "下一条怎么做"],
-  experiments: ["数据看板 / 内容实验室", "内容实验室"],
-  precheck: ["违规检测", "违规检测"]
+  lifecycle: ["发布后功能 / 生命周期对比", "笔记生命周期对比"],
+  publish: ["发布后功能 / 发布时间分析", "发布时间分析"],
+  funnel: ["发布后功能 / 内容诊断", "分叉式内容诊断"],
+  cover: ["发布后功能 / 封面分析", "封面分析"],
+  notes: ["发布后功能 / 数据总览", "数据总览"],
+  strategy: ["发布后功能 / 下一条怎么做", "下一条怎么做"],
+  experiments: ["发布后功能 / 创作计划", "创作计划"],
+  precheck: ["发布前功能 / 违规检测", "违规检测"]
 };
 
 const CHECKER_TAB_META = {
-  audit: ["违规检测 / 违规检测", "违规检测"],
-  history: ["违规检测 / 历史检测记录", "历史检测记录"],
-  knowledge: ["违规检测 / 知识库", "知识库"],
-  practice: ["违规检测 / 实操库", "实操库"],
-  membership: ["违规检测 / 会员中心", "会员中心"],
-  admin: ["违规检测 / 管理实操库", "管理实操库"],
-  login: ["违规检测 / 登录", "登录"],
-  register: ["违规检测 / 注册", "注册"]
+  audit: ["发布前功能 / 违规检测", "违规检测"],
+  history: ["发布前功能 / 历史检测记录", "历史检测记录"],
+  knowledge: ["发布前功能 / 知识库", "知识库"],
+  practice: ["发布前功能 / 实操库", "实操库"],
+  article: ["发布前功能 / 实操文章", "实操文章"],
+  membership: ["发布前功能 / 会员中心", "会员中心"],
+  admin: ["发布前功能 / 管理实操库", "管理实操库"],
+  login: ["发布前功能 / 登录", "登录"],
+  register: ["发布前功能 / 注册", "注册"]
 };
 
 function formatNumber(value) {
@@ -683,6 +686,7 @@ function notesMedianRow(rows) {
   const value = (key, options) => medianOf(rows, key, options);
   return `
     <tr class="median-row">
+      <td>-</td>
       <td><div class="note-title">中位数</div></td>
       <td>当前筛选</td>
       <td>-</td>
@@ -900,22 +904,60 @@ function analysisList(items) {
   return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
 
+function compactCoverItem(value) {
+  const item = String(value || "").replace(/^\s*[-*+]\s+/, "").replace(/\s+/g, " ").trim();
+  if (!item) return "";
+  const characters = Array.from(item);
+  return characters.length > 30 ? `${characters.slice(0, 29).join("")}…` : item;
+}
+
+function coverMarkdownItems(markdown, heading) {
+  const pattern = new RegExp(`(?:^|\\n)#{1,6}\\s*${heading}[^\\n]*\\n([\\s\\S]*?)(?=\\n#{1,6}\\s|$)`, "i");
+  const section = String(markdown || "").match(pattern)?.[1] || "";
+  return section.split("\n")
+    .filter((line) => /^\s*[-*+]\s+/.test(line))
+    .map(compactCoverItem)
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function coverAnalysisMarkdown(analysis) {
+  const boundedItems = (items) => (Array.isArray(items) ? items : [])
+    .map(compactCoverItem)
+    .filter(Boolean)
+    .slice(0, 3);
+  const markdownStrengths = coverMarkdownItems(analysis.markdown, "优势");
+  const markdownRisks = coverMarkdownItems(analysis.markdown, "风险");
+  const strengths = markdownStrengths.length
+    ? markdownStrengths
+    : boundedItems(analysis.strengths);
+  const risks = markdownRisks.length
+    ? markdownRisks
+    : boundedItems(analysis.risks);
+  return [
+    "## 优势",
+    ...(strengths.length ? strengths.map((item) => `- ${item}`) : ["- 暂无明确优势"]),
+    "",
+    "## 风险",
+    ...(risks.length ? risks.map((item) => `- ${item}`) : ["- 暂无明显风险"])
+  ].join("\n");
+}
+
+function renderSafeMarkdown(markdown) {
+  const source = String(markdown || "").trim();
+  const html = window.EasyMDE
+    ? window.EasyMDE.prototype.markdown.call({ options: { renderingConfig: { sanitizerFunction: (value) => window.DOMPurify ? window.DOMPurify.sanitize(value) : value } } }, source)
+    : escapeHtml(source).replace(/\n/g, "<br>");
+  return window.DOMPurify ? window.DOMPurify.sanitize(html) : html;
+}
+
 function coverAnalysisHtml(analysis, note) {
   if (!analysis) return '<div class="empty-analysis">尚未分析封面。</div>';
   return `
     <div class="cover-analysis-grid">
       ${note?.coverImageUrl ? `<img class="analysis-cover-image" src="${escapeHtml(note.coverImageUrl)}" alt="${escapeHtml(note.title || "")}" referrerpolicy="no-referrer" />` : ""}
       <div class="cover-analysis-copy">
-        <h4>${escapeHtml(analysis.summary || "封面解读")}</h4>
-        <dl class="analysis-definition-list">
-          <div><dt>视觉元素</dt><dd>${analysisList(analysis.visualElements)}</dd></div>
-          <div><dt>封面承诺</dt><dd>${escapeHtml(analysis.textAndPromise || "-")}</dd></div>
-          <div><dt>优势</dt><dd>${analysisList(analysis.strengths)}</dd></div>
-          <div><dt>风险</dt><dd>${analysisList(analysis.risks)}</dd></div>
-          <div><dt>解释假设</dt><dd>${analysisList(analysis.hypotheses)}</dd></div>
-          <div><dt>可验证实验</dt><dd>${analysisList(analysis.suggestedTests)}</dd></div>
-        </dl>
-        <div class="analysis-meta">${escapeHtml(analysis.model || "")}${analysis.analyzedAt ? ` · ${new Date(analysis.analyzedAt).toLocaleString("zh-CN")}` : ""}</div>
+        <div class="cover-analysis-markdown">${renderSafeMarkdown(coverAnalysisMarkdown(analysis))}</div>
       </div>
     </div>
   `;
@@ -934,7 +976,6 @@ function renderCoverAiPanel(noteKey = state.coverAiNoteKey) {
     <div class="strategy-section-head">
       <div>
         <h3>${escapeHtml(note?.title || "封面分析")}</h3>
-        <p>${analysis ? "本地已保存的 AI 封面解读" : "这篇笔记还没有生成 AI 封面解读"}</p>
       </div>
       <button class="button ${analysis ? "" : "primary"}" type="button" data-run-cover-ai="${escapeHtml(noteKey)}">${analysis ? "重新分析" : "开始分析"}</button>
     </div>
@@ -1024,7 +1065,7 @@ function strategyResultHtml(result) {
         `).join("")}
       </div>
     </section>
-    <div class="analysis-meta">${escapeHtml(result.model || "")}${result.analyzedAt ? ` · ${new Date(result.analyzedAt).toLocaleString("zh-CN")}` : ""}</div>
+    ${result.analyzedAt ? `<div class="analysis-meta">${new Date(result.analyzedAt).toLocaleString("zh-CN")}</div>` : ""}
   `;
 }
 
@@ -1032,13 +1073,6 @@ function renderStrategyPayload({ preserveInputs = false } = {}) {
   const payload = state.strategyPayload;
   const note = selectedStrategyNote();
   const analysis = payload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
-  const status = document.getElementById("strategyAiStatus");
-  if (status) {
-    status.textContent = payload?.ai?.configured
-      ? `${payload.ai.visionModel} / ${payload.ai.strategyModel}`
-      : "AI模型未配置";
-    status.classList.toggle("warning", !payload?.ai?.configured);
-  }
   renderStrategyFacts(payload?.facts);
   document.getElementById("strategyCoverAnalysis").innerHTML = coverAnalysisHtml(analysis?.coverAnalysis, note);
   document.getElementById("strategyResult").innerHTML = strategyResultHtml(analysis?.strategyAnalysis);
@@ -1160,6 +1194,272 @@ function activeStrategyAnalysis() {
   return state.strategyPayload?.analysis || state.data.aiAnalysis?.[note?.noteKey] || null;
 }
 
+function updateCreationPlanState(plan) {
+  if (!plan) return;
+  state.nextContentPlan = plan;
+  state.data.creationPlans = [
+    plan,
+    ...(state.data.creationPlans || []).filter((item) => item.id !== plan.id)
+  ];
+}
+
+function nextContentReferenceCard(note) {
+  return `
+    <article class="next-content-reference-card">
+      ${note.coverImageUrl
+        ? `<img src="${escapeAttr(note.coverImageUrl)}" alt="" referrerpolicy="no-referrer" />`
+        : '<div class="next-content-reference-placeholder">封面</div>'}
+      <span>${escapeHtml(shortTitle(note.title || "未命名作品"))}</span>
+    </article>
+  `;
+}
+
+function renderNextContentEvidence(references) {
+  const container = document.getElementById("nextContentEvidence");
+  if (!container) return;
+  const labels = {
+    cover: "封面参考",
+    opening: "开头参考",
+    completion: "内容结构参考"
+  };
+  const sections = ["cover", "opening", "completion"].map((key) => {
+    const group = references?.[key];
+    if (!group || (!(group.strong || []).length && !(group.weak || []).length)) return "";
+    return `
+      <section class="next-content-reference-section">
+        <h4>${escapeHtml(labels[key])}</h4>
+        <div class="next-content-reference-group">
+          <span>值得参考</span>
+          <div>${(group.strong || []).map(nextContentReferenceCard).join("")}</div>
+        </div>
+        <div class="next-content-reference-group weak">
+          <span>建议避开</span>
+          <div>${(group.weak || []).map(nextContentReferenceCard).join("")}</div>
+        </div>
+      </section>
+    `;
+  }).filter(Boolean);
+  container.innerHTML = sections.join("") || '<p class="analysis-muted">暂无可展示的历史参考作品。</p>';
+}
+
+function renderNextContentPlan(plan) {
+  if (!plan) return;
+  document.getElementById("nextContentUnavailable")?.classList.add("hidden");
+  document.getElementById("nextContentComposer")?.classList.add("hidden");
+  document.getElementById("nextContentResult")?.classList.remove("hidden");
+  document.getElementById("nextContentFocus").textContent = plan.optimizationFocus || "已根据历史内容完成优化";
+  document.getElementById("nextContentCoverPrompt").textContent = plan.coverPrompt || "-";
+  document.getElementById("nextContentOpening").textContent = plan.openingHook || "-";
+  const alternatives = (plan.alternativeTitles || []).length
+    ? { label: "备选标题", items: plan.alternativeTitles }
+    : { label: "备选开头", items: plan.alternativeHooks || [] };
+  document.getElementById("nextContentAlternatives").innerHTML = alternatives.items.length
+    ? alternatives.items.map((item, index) => `
+        <div><span>${escapeHtml(alternatives.label)} ${index + 1}</span><p>${escapeHtml(item)}</p></div>
+      `).join("")
+    : "";
+  const structure = (plan.contentStructure || []).join(" → ");
+  document.getElementById("nextContentStructure").textContent = [
+    plan.primaryTitle ? `推荐标题：${plan.primaryTitle}` : "",
+    structure ? `结构：${structure}` : ""
+  ].filter(Boolean).join(" · ");
+  document.getElementById("nextContentMarkdown").innerHTML = renderSafeMarkdown(plan.rewrittenMarkdown || "");
+  document.getElementById("nextContentSaveStatus").textContent = plan.status === "planned" ? "已保存为创作计划" : "已自动保存";
+  const saveButton = document.getElementById("saveCreationPlanBtn");
+  saveButton.disabled = plan.status === "planned";
+  saveButton.textContent = plan.status === "planned" ? "已保存为创作计划" : "保存为创作计划";
+  document.getElementById("nextContentDraft").value = plan.input || "";
+  renderNextContentEvidence(plan.references);
+}
+
+function renderStrategyAnalysis() {
+  if (!state.data) return;
+  if (state.nextContentPlan) {
+    renderNextContentPlan(state.nextContentPlan);
+    return;
+  }
+  const status = state.data.nextContentStatus || {};
+  const unavailable = document.getElementById("nextContentUnavailable");
+  const composer = document.getElementById("nextContentComposer");
+  document.getElementById("nextContentResult")?.classList.add("hidden");
+  unavailable?.classList.toggle("hidden", Boolean(status.eligible));
+  composer?.classList.toggle("hidden", !status.eligible);
+  if (!status.eligible) {
+    document.getElementById("nextContentUnavailableTitle").textContent = status.reason || "历史作品数据不足";
+    document.getElementById("nextContentUnavailableText").textContent = status.remainingNotes > 0
+      ? "导入至少3篇作品后，系统才能结合你的历史表现生成方案。"
+      : "至少需要一个指标包含3条有效数据，请重新导入完整数据。";
+  }
+}
+
+async function generateNextContent() {
+  const draft = document.getElementById("nextContentDraft").value.trim();
+  const button = document.getElementById("generateNextContentBtn");
+  const status = document.getElementById("nextContentActionStatus");
+  if (!draft) {
+    status.textContent = "请先粘贴标题、正文或口播稿。";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "生成中...";
+  status.textContent = "正在匹配相似内容并生成方案……";
+  try {
+    const response = await fetch("/api/next-content/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draft })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "生成失败");
+    updateCreationPlanState(payload.plan);
+    renderNextContentPlan(payload.plan);
+    renderCreationPlans();
+    status.textContent = "";
+  } catch (error) {
+    status.textContent = `生成失败：${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "生成下一条方案";
+  }
+}
+
+async function saveCurrentCreationPlan(patch, { quiet = false } = {}) {
+  const plan = state.nextContentPlan;
+  if (!plan?.id) return;
+  const saveStatus = document.getElementById("nextContentSaveStatus");
+  if (!quiet) saveStatus.textContent = "正在保存...";
+  try {
+    const response = await fetch(`/api/creation-plans/${encodeURIComponent(plan.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "保存失败");
+    updateCreationPlanState(payload.plan);
+    saveStatus.textContent = payload.plan.status === "planned" ? "已保存为创作计划" : "已自动保存";
+    renderCreationPlans();
+    if (patch.status === "planned") renderNextContentPlan(payload.plan);
+  } catch (error) {
+    saveStatus.textContent = `保存失败：${error.message}`;
+  }
+}
+
+function editableContentToMarkdown(element) {
+  if (!element) return "";
+  const blocks = [...element.childNodes].map((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent.trim();
+    const tag = node.tagName?.toLowerCase();
+    const text = node.innerText?.trim() || "";
+    if (!text) return "";
+    if (tag === "h1") return `# ${text}`;
+    if (tag === "h2") return `## ${text}`;
+    if (tag === "h3") return `### ${text}`;
+    if (tag === "blockquote") return text.split("\n").map((line) => `> ${line}`).join("\n");
+    if (tag === "ul") return [...node.querySelectorAll(":scope > li")].map((item) => `- ${item.innerText.trim()}`).join("\n");
+    if (tag === "ol") return [...node.querySelectorAll(":scope > li")].map((item, index) => `${index + 1}. ${item.innerText.trim()}`).join("\n");
+    if (tag === "pre") return `\`\`\`\n${text}\n\`\`\``;
+    return text;
+  }).filter(Boolean);
+  return blocks.length ? blocks.join("\n\n") : element.innerText.trim();
+}
+
+function scheduleNextContentAutosave() {
+  clearTimeout(state.nextContentSaveTimer);
+  const saveStatus = document.getElementById("nextContentSaveStatus");
+  saveStatus.textContent = "正在编辑...";
+  state.nextContentSaveTimer = setTimeout(() => {
+    const rewrittenMarkdown = editableContentToMarkdown(document.getElementById("nextContentMarkdown"));
+    state.nextContentPlan = { ...state.nextContentPlan, rewrittenMarkdown };
+    saveCurrentCreationPlan({ rewrittenMarkdown }, { quiet: true });
+  }, 800);
+}
+
+async function copyNextContent(kind) {
+  const plan = state.nextContentPlan;
+  const value = kind === "cover"
+    ? plan?.coverPrompt
+    : editableContentToMarkdown(document.getElementById("nextContentMarkdown"));
+  if (!value) return;
+  await navigator.clipboard.writeText(value);
+  const button = document.querySelector(`[data-copy-next-content="${kind}"]`);
+  const original = button.textContent;
+  button.textContent = "已复制";
+  setTimeout(() => { button.textContent = original; }, 1200);
+}
+
+function creationPlanAuditImages(plan) {
+  const images = Array.isArray(plan?.images)
+    ? plan.images
+    : Array.isArray(plan?.imageUrls)
+      ? plan.imageUrls
+      : [];
+  return images
+    .map((image) => typeof image === "string" ? image : image?.url || image?.dataUrl || "")
+    .filter((image) => /^(?:https?:|data:image\/)/i.test(image))
+    .slice(0, 18);
+}
+
+async function sendCurrentPlanToContentChecker() {
+  const plan = state.nextContentPlan;
+  if (!plan) return;
+  const status = document.getElementById("nextContentSaveStatus");
+  const body = editableContentToMarkdown(document.getElementById("nextContentMarkdown")) || plan.rewrittenMarkdown || plan.input || "";
+  const payload = {
+    title: plan.primaryTitle || "",
+    body,
+    images: creationPlanAuditImages(plan)
+  };
+  if (!payload.title && !payload.body && !payload.images.length) {
+    status.textContent = "没有可带入检测的内容。";
+    return;
+  }
+  if (!window.ContentChecker?.prefillAudit) {
+    status.textContent = "违规检测页面暂不可用。";
+    return;
+  }
+  status.textContent = "正在带入违规检测…";
+  try {
+    await window.ContentChecker.prefillAudit(payload);
+  } catch (error) {
+    status.textContent = `带入失败：${error.message}`;
+  }
+}
+
+function creationPlanCardHtml(plan) {
+  const createdAt = plan.updatedAt ? new Date(plan.updatedAt).toLocaleString("zh-CN") : "";
+  return `
+    <article class="creation-plan-card">
+      <div>
+        <span class="experiment-status ${plan.status === "planned" ? "verified" : ""}">${plan.status === "planned" ? "计划中" : "草稿"}</span>
+        <h3>${escapeHtml(plan.primaryTitle || "未命名创作计划")}</h3>
+        <p>${escapeHtml(plan.optimizationFocus || "")}</p>
+      </div>
+      <div class="creation-plan-card-meta">
+        <span>${escapeHtml(createdAt)}</span>
+        <button class="button" type="button" data-open-creation-plan="${escapeAttr(plan.id)}">打开</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderCreationPlans() {
+  const container = document.getElementById("creationPlanList");
+  if (!container || !state.data) return;
+  const plans = state.data.creationPlans || [];
+  container.innerHTML = plans.length
+    ? plans.map(creationPlanCardHtml).join("")
+    : '<div class="empty-analysis">还没有创作计划。先在“下一条怎么做”中生成一条方案。</div>';
+}
+
+function openCreationPlan(planId) {
+  const plan = (state.data.creationPlans || []).find((item) => item.id === planId);
+  if (!plan) return;
+  state.nextContentPlan = plan;
+  setView("strategy");
+  renderNextContentPlan(plan);
+}
+
 function closeTopMenus(exceptGroup) {
   document.querySelectorAll("[data-menu-panel]").forEach((panel) => {
     const isExcepted = panel.dataset.menuPanel === exceptGroup;
@@ -1182,10 +1482,26 @@ function setView(view, checkerTab) {
   if (checkerTab && CHECKER_TAB_META[checkerTab]) state.checkerTab = checkerTab;
   document.querySelectorAll(".menu-item").forEach((menu) => {
     const isCheckerItem = Boolean(menu.dataset.checkerTab);
-    menu.classList.toggle("active", menu.dataset.view === state.view && (!isCheckerItem || menu.dataset.checkerTab === state.checkerTab));
+    const activeCheckerTab = state.checkerTab === "article" ? "practice" : state.checkerTab;
+    menu.classList.toggle("active", menu.dataset.view === state.view && (!isCheckerItem || menu.dataset.checkerTab === activeCheckerTab));
+  });
+  document.querySelectorAll("[data-view-entry]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.viewEntry === state.view);
+  });
+  document.querySelectorAll("[data-checker-view-entry]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.checkerViewEntry === state.checkerTab);
   });
   syncTopMenuState();
   renderView();
+}
+
+function openCoverAnalysis(noteKey) {
+  state.coverAiNoteKey = noteKey;
+  setView("cover");
+  renderCoverAiPanel(noteKey);
+  requestAnimationFrame(() => {
+    document.getElementById("coverAiPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 async function startContentExperiment(index) {
@@ -1270,7 +1586,7 @@ function experimentCardHtml(experiment) {
         <span class="experiment-summary-meta">
           <span>${escapeHtml(source)}</span>
           <span class="analysis-meta">${escapeHtml(createdAt)}</span>
-          <span class="experiment-summary-icon" aria-hidden="true">›</span>
+          <span class="experiment-summary-icon app-icon icon-chevron-right" aria-hidden="true"></span>
         </span>
       </button>
       <div class="experiment-card-detail">
@@ -1337,7 +1653,6 @@ function renderSummary() {
   document.getElementById("totalImpressions").textContent = formatNumber(summary.totalImpressions);
   document.getElementById("totalViews").textContent = formatNumber(summary.totalViews);
   document.getElementById("totalInteractions").textContent = formatNumber(summary.totalInteractions);
-  document.getElementById("syncMeta").textContent = ``;
 }
 
 function renderLifecycleChart() {
@@ -1409,26 +1724,6 @@ function renderLifecycleChart() {
     },
     series
   }, true);
-}
-
-function renderInsights() {
-  const notes = state.data.notes;
-  const completeM24 = notes.filter((note) => isCompleteValue(lifecycleProfile(note).m24));
-  const completeTail = notes.filter((note) => isCompleteValue(lifecycleProfile(note).tailShare));
-  const fastest = [...completeM24].sort((a, b) => lifecycleProfile(b).m24 - lifecycleProfile(a).m24)[0];
-  const strongestTail = [...completeTail].sort((a, b) => lifecycleProfile(b).tailShare - lifecycleProfile(a).tailShare)[0];
-  const fastestProfile = fastest ? lifecycleProfile(fastest) : null;
-  const tailProfile = strongestTail ? lifecycleProfile(strongestTail) : null;
-
-  const items = [
-    fastest && `账号内 24 小时互动最高：${shortTitle(fastest.title)}，${formatNumber(fastestProfile.m24)}。`,
-    strongestTail && `账号内长尾增量占比最高：${shortTitle(strongestTail.title)}，7-14 天增量占比 ${formatPct(tailProfile.tailShare)}。`,
-    (!fastest || !strongestTail) && "部分笔记的时间序列窗口未完整覆盖，已停止参与生命周期判断。",
-    "曝光/观看的 1小时、6小时数据官方导出未提供，早期判断优先看互动、收藏、评论、涨粉。",
-    "生命周期标签按同系列、同类内容或最近 30 篇的四分位判断，不使用固定互动数或固定比例。"
-  ].filter(Boolean);
-
-  document.getElementById("insightList").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
 
 function lifecycleTableRecords() {
@@ -1577,7 +1872,7 @@ function renderPublishHeatmap() {
       encode: { x: 0, y: 1, value: 2 },
       label: {
         show: true,
-        color: "#26333f",
+        color: "#ffffff",
         formatter: (params) => {
           const value = params.value[2];
           if (value == null) return "";
@@ -1915,7 +2210,7 @@ function renderReviewFields() {
               <label>${escapeHtml(label)}</label>
               <button class="review-dropdown-trigger" type="button" data-review-dropdown-toggle="${field}" aria-expanded="false">
                 <span class="${selectedText ? "" : "placeholder"}">${escapeHtml(selectedText || `请选择${label}`)}</span>
-                <i>⌄</i>
+                <i class="app-icon icon-chevron-down" aria-hidden="true"></i>
               </button>
               <div class="review-dropdown-menu hidden">
                 <div class="review-dropdown-options">
@@ -1927,7 +2222,7 @@ function renderReviewFields() {
                       data-review-value="${encodeURIComponent(option)}"
                       aria-pressed="${selected.has(option)}"
                     >
-                      <span class="review-option-check">${selected.has(option) ? "✓" : ""}</span>
+                      <span class="review-option-check">${selected.has(option) ? '<span class="app-icon icon-check" aria-hidden="true"></span>' : ""}</span>
                       <span>${escapeHtml(option)}</span>
                     </button>
                   `).join("")}
@@ -1979,14 +2274,25 @@ function openNoteReviewModal(noteKey) {
   resetReviewDraft();
   renderNoteReviewCard();
   const modal = document.getElementById("noteReviewModal");
-  modal.classList.remove("hidden");
+  if (window.Modal) {
+    state.reviewModal ||= new window.Modal(modal, {
+      placement: "center",
+      backdrop: "dynamic",
+      closable: true,
+      onHide: () => document.body.classList.remove("modal-open")
+    });
+    state.reviewModal.show();
+  } else {
+    modal.classList.remove("hidden");
+  }
   document.body.classList.add("modal-open");
   document.getElementById("noteReviewStatus").textContent = "";
   requestAnimationFrame(() => document.querySelector("[data-close-review-modal]")?.focus());
 }
 
 function closeNoteReviewModal() {
-  document.getElementById("noteReviewModal").classList.add("hidden");
+  if (state.reviewModal) state.reviewModal.hide();
+  else document.getElementById("noteReviewModal").classList.add("hidden");
   document.body.classList.remove("modal-open");
 }
 
@@ -2048,6 +2354,7 @@ function renderNotesCompareTable() {
   const pageRows = paginatedRows(rows, "notes");
   tbody.innerHTML = notesMedianRow(rows) + pageRows.map((record) => `
     <tr>
+      <td><button class="button cover-analysis-button" type="button" data-open-cover-analysis="${escapeHtml(record.note.noteKey)}">封面分析</button></td>
       <td><div class="note-title">${escapeHtml(record.title)}</div></td>
       <td>${escapeHtml(record.publishedAtText)}</td>
       <td>${escapeHtml(record.type)}</td>
@@ -2150,11 +2457,10 @@ function renderView() {
   breadcrumb.textContent = meta[0];
   heading.textContent = meta[1];
   const precheckActive = state.view === "precheck";
-  const pageKicker = document.querySelector(".page-kicker");
-  if (pageKicker) pageKicker.textContent = precheckActive ? "违规检测" : "数据看板";
-  document.querySelector(".compact-summary")?.classList.toggle("hidden", precheckActive);
-  document.querySelector(".data-status")?.classList.toggle("hidden", precheckActive);
-  document.getElementById("refreshBtn")?.classList.toggle("hidden", precheckActive);
+  document.querySelector(".compact-summary")?.classList.toggle("hidden", state.view !== "notes");
+  document.querySelector(".page-view-navigation:not(.precheck-view-navigation)")?.classList.toggle("hidden", precheckActive);
+  document.querySelector(".precheck-view-navigation")?.classList.toggle("hidden", !precheckActive || !["audit", "history"].includes(state.checkerTab));
+  document.getElementById("refreshBtn")?.classList.toggle("hidden", state.view !== "notes");
   if (state.view === "precheck") {
     window.ContentChecker?.show(state.checkerTab);
   }
@@ -2172,14 +2478,13 @@ function renderView() {
 function render() {
   renderSummary();
   renderLifecycleChart();
-  renderInsights();
   renderTable();
   renderPublishAnalysis();
-  renderFunnelAnalysis();
+  if (state.view === "funnel") renderFunnelAnalysis();
   renderCoverAnalysis();
   renderNotesCompare();
   renderStrategyAnalysis();
-  renderExperimentLab();
+  renderCreationPlans();
   renderView();
 }
 
@@ -2212,8 +2517,9 @@ async function refreshImport() {
 }
 
 document.getElementById("refreshBtn").addEventListener("click", refreshImport);
-document.getElementById("experimentImportBtn").addEventListener("click", refreshImport);
-document.getElementById("openExperimentLabBtn").addEventListener("click", () => setView("experiments"));
+document.getElementById("generateNextContentBtn")?.addEventListener("click", generateNextContent);
+document.getElementById("saveCreationPlanBtn")?.addEventListener("click", () => saveCurrentCreationPlan({ status: "planned" }));
+document.getElementById("nextContentMarkdown")?.addEventListener("input", scheduleNextContentAutosave);
 document.getElementById("chartMetricSelect").addEventListener("change", (event) => {
   state.chartMetric = event.target.value;
   renderLifecycleChart();
@@ -2240,12 +2546,6 @@ document.getElementById("coverSortSelect").addEventListener("change", (event) =>
   resetTablePage("cover");
   renderCoverAnalysis();
 });
-document.getElementById("strategyNoteSelect").addEventListener("change", (event) => {
-  state.strategyNoteKey = event.target.value;
-  state.strategyPayload = null;
-  loadStrategyPayload();
-});
-document.getElementById("generateStrategyBtn").addEventListener("click", generateStrategy);
 document.getElementById("notesCompareSearch").addEventListener("input", (event) => {
   state.notesCompareSearch = event.target.value;
   resetTablePage("notes");
@@ -2368,6 +2668,12 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const coverAnalysisButton = event.target.closest("[data-open-cover-analysis]");
+  if (coverAnalysisButton) {
+    openCoverAnalysis(coverAnalysisButton.dataset.openCoverAnalysis);
+    return;
+  }
+
   const coverAiButton = event.target.closest("[data-cover-ai]");
   if (coverAiButton) {
     state.coverAiNoteKey = coverAiButton.dataset.coverAi;
@@ -2379,6 +2685,38 @@ document.addEventListener("click", (event) => {
   const runCoverAiButton = event.target.closest("[data-run-cover-ai]");
   if (runCoverAiButton) {
     runCoverAnalysis(runCoverAiButton.dataset.runCoverAi, runCoverAiButton);
+    return;
+  }
+
+  const copyNextContentButton = event.target.closest("[data-copy-next-content]");
+  if (copyNextContentButton) {
+    copyNextContent(copyNextContentButton.dataset.copyNextContent).catch((error) => {
+      document.getElementById("nextContentSaveStatus").textContent = `复制失败：${error.message}`;
+    });
+    return;
+  }
+
+  if (event.target.closest("#sendToContentCheckerBtn")) {
+    sendCurrentPlanToContentChecker();
+    return;
+  }
+
+  if (event.target.closest("[data-edit-next-content]")) {
+    state.nextContentPlan = null;
+    document.getElementById("nextContentResult")?.classList.add("hidden");
+    document.getElementById("nextContentComposer")?.classList.remove("hidden");
+    document.getElementById("nextContentDraft")?.focus();
+    return;
+  }
+
+  if (event.target.closest("[data-import-next-content]")) {
+    refreshImport();
+    return;
+  }
+
+  const openCreationPlanButton = event.target.closest("[data-open-creation-plan]");
+  if (openCreationPlanButton) {
+    openCreationPlan(openCreationPlanButton.dataset.openCreationPlan);
     return;
   }
 
@@ -2446,6 +2784,14 @@ document.querySelectorAll(".menu-item").forEach((item) => {
   });
 });
 
+document.querySelectorAll("[data-view-entry]").forEach((button) => {
+  button.addEventListener("click", () => setView(button.dataset.viewEntry));
+});
+
+document.querySelectorAll("[data-checker-view-entry]").forEach((button) => {
+  button.addEventListener("click", () => setView("precheck", button.dataset.checkerViewEntry));
+});
+
 document.querySelectorAll("[data-menu-toggle]").forEach((trigger) => {
   trigger.addEventListener("click", () => {
     const group = trigger.dataset.menuToggle;
@@ -2465,7 +2811,7 @@ window.addEventListener("content-checker-tabchange", (event) => {
 });
 
 loadData().catch((error) => {
-  document.getElementById("syncMeta").textContent = `读取失败：${error.message}`;
+  console.error("读取仪表盘数据失败：", error);
 });
 
 window.ContentChecker?.init();

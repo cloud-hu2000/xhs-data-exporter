@@ -9,7 +9,7 @@ const { audit } = require("./content-checker-moderation");
 
 function createContentCheckerRouter({ projectRoot }) {
   const router = express.Router();
-  const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(projectRoot, "data", "content-checker-uploads"));
+  const uploadDir = path.join(projectRoot, "data", "content-checker-uploads");
   const adminEmails = new Set(String(process.env.ADMIN_EMAILS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean));
   const upload = multer({ storage: multer.memoryStorage(), limits: { files: 18, fileSize: 10 * 1024 * 1024 } });
   let pool;

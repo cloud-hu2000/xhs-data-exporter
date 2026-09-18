@@ -41,8 +41,8 @@ function ruleIssues(text, source) {
 async function modelIssues(input, candidates) {
   const apiKey = process.env.DASHSCOPE_API_KEY;
   if (!apiKey) return { status: "skipped", issues: [], model: undefined, message: "未配置 DASHSCOPE_API_KEY，未调用多模态模型。" };
-  const model = process.env.DASHSCOPE_VL_MODEL || "qwen3.6-flash";
-  const endpoint = `${(process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1").replace(/\/$/, "")}/chat/completions`;
+  const model = "qwen3.8-flash";
+  const endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
   const content = [{ type: "text", text: `审核发布前内容。平台：${input.platform}。标题：${input.title}。正文：${input.body}。规则线索：${JSON.stringify(candidates.map(({ category, severity, evidence }) => ({ category, severity, evidence })))}。只返回 JSON：{"issues":[{"source":"title|body|image","imageIndex":1,"category":"分类","severity":"LOW|MEDIUM|HIGH","evidence":"可见证据","reason":"简短原因","suggestion":"可执行建议","bbox":{"x":0,"y":0,"width":0,"height":0}}]}。不得宣称官方审核结论。` }];
   input.images.forEach((image, index) => content.push({ type: "text", text: `图片 ${index + 1}` }, { type: "image_url", image_url: { url: image.dataUrl } }));
   try {

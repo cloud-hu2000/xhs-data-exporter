@@ -2,12 +2,14 @@ const DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const { writeDebugLog } = require("./debug-logger");
 
 function config() {
+  const strategyModel = "qwen3.8-flash";
   return {
     apiKey: process.env.DASHSCOPE_API_KEY || "",
-    baseUrl: (process.env.DASHSCOPE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, ""),
-    visionModel: process.env.DASHSCOPE_VISION_MODEL || "qwen3.6-flash",
-    strategyModel: process.env.DASHSCOPE_STRATEGY_MODEL || "qwen-plus",
-    asrModel: process.env.DASHSCOPE_ASR_MODEL || "qwen3-asr-flash"
+    baseUrl: DEFAULT_BASE_URL,
+    // Image understanding and strategy generation intentionally share one model setting.
+    visionModel: strategyModel,
+    strategyModel,
+    asrModel: "qwen3-asr-flash"
   };
 }
 
@@ -129,14 +131,14 @@ async function analyzeCover(note, facts) {
     messages: [
       {
         role: "system",
-        content: "你是短视频与图文封面分析师。只分析画面中可观察到的事实，并结合提供的数据提出可验证假设。必须返回 JSON。"
+        content: "你是短视频与图文封面分析师。只分析画面中可观察到的事实，并结合提供的数据提出简短判断。必须返回 JSON。"
       },
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `分析这张小红书封面。标题：${note.title || ""}\n数据事实：${JSON.stringify(facts.facts)}\n返回 JSON，字段固定为：summary（string）、visualElements（string[]）、textAndPromise（string）、strengths（string[]）、risks（string[]）、hypotheses（string[]）、suggestedTests（string[]）。`
+            text: `分析这张小红书封面。标题：${note.title || ""}\n数据事实：${JSON.stringify(facts.facts)}\n只返回 JSON，且仅含 markdown（string）字段。markdown 必须严格使用以下 Markdown 结构：\n## 优势\n- 一条简短优势\n## 风险\n- 一条简短风险\n优势、风险各最多 3 条；每条不超过 30 个中文字符；不写摘要、视觉元素、解释、建议、实验、前言或结语。`
           },
           { type: "image_url", image_url: { url: imageUrl } }
         ]
@@ -492,11 +494,148 @@ async function analyzeStrategy({ note, facts, accountContext, evidenceCatalog, c
   return analysis;
 }
 
+function normalizeMatchedNoteKeys(result, allowedKeys, minimum = 3) {
+  const allowed = new Set(allowedKeys || []);
+  const raw = Array.isArray(result?.matched_note_keys) ? result.matched_note_keys : [];
+  const matched = [...new Set(raw.map((item) => String(item || "").trim()))]
+    .filter((key) => allowed.has(key));
+  if (matched.length >= minimum) return matched;
+  return [...allowed].slice(0, Math.max(minimum, allowed.size));
+}
+
+async function matchSimilarNotes({ draft, notes }) {
+  const settings = config();
+  const compactNotes = (notes || []).map((note) => ({
+    noteKey: note.noteKey,
+    title: note.title || "",
+    content: String(note.content || "").slice(0, 600),
+    openingExcerpt: note.openingExcerpt || null,
+    review: note.review || null
+  }));
+  const result = await chatCompletion({
+    model: settings.strategyModel,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "你负责从账号历史内容中寻找与新文案语义最接近的作品。",
+          "只根据主题、内容类型、目标人群和表达形式判断相似度，不参考数据表现。",
+          "必须返回 JSON，且只能从给定 noteKey 中选择。",
+          "至少选择 3 篇；历史作品不足 12 篇时可以全部返回；最多选择 12 篇。"
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: `新文案：\n${String(draft || "").slice(0, 16000)}\n\n历史内容：${JSON.stringify(compactNotes)}\n\n返回：{"matched_note_keys":["noteKey"]}`
+      }
+    ]
+  });
+  return normalizeMatchedNoteKeys(result, compactNotes.map((note) => note.noteKey));
+}
+
+function normalizeNextContentResult(result = {}) {
+  const clean = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+  const list = (value, maxItems, maxLength) => (Array.isArray(value) ? value : [])
+    .map((item) => clean(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+  const normalized = {
+    input_type: ["title", "caption", "script", "mixed"].includes(result.input_type)
+      ? result.input_type
+      : "mixed",
+    optimization_focus: clean(result.optimization_focus, 500),
+    primary_title: clean(result.primary_title, 300),
+    alternative_titles: list(result.alternative_titles, 2, 300),
+    cover_prompt: clean(result.cover_prompt, 3000),
+    opening_hook: clean(result.opening_hook, 1500),
+    alternative_hooks: list(result.alternative_hooks, 2, 800),
+    content_structure: list(result.content_structure, 8, 500),
+    rewritten_markdown: clean(result.rewritten_markdown, 30000),
+    validation_focus: ["cover_click", "opening_retention", "completion"].includes(result.validation_focus)
+      ? result.validation_focus
+      : "completion"
+  };
+  if (!normalized.primary_title) throw new Error("模型未返回推荐标题");
+  if (!normalized.cover_prompt) throw new Error("模型未返回封面提示词");
+  if (!normalized.opening_hook) throw new Error("模型未返回开头文案");
+  if (!normalized.rewritten_markdown) throw new Error("模型未返回优化后文案");
+  if (normalized.validation_focus === "cover_click") normalized.alternative_hooks = [];
+  else normalized.alternative_titles = [];
+  return normalized;
+}
+
+async function analyzeNextContent({ draft, evidence, historicalContext }) {
+  const settings = config();
+  const input = {
+    draft: String(draft || "").slice(0, 20000),
+    evidence,
+    historicalContext: (historicalContext || []).map((note) => ({
+      noteKey: note.noteKey,
+      title: note.title || "",
+      content: String(note.content || "").slice(0, 1200),
+      openingExcerpt: note.openingExcerpt || null,
+      review: note.review || null
+    }))
+  };
+  writeDebugLog("bailian", "analyzeNextContent.start", {
+    model: settings.strategyModel,
+    input
+  });
+  const result = await chatCompletion({
+    model: settings.strategyModel,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "你是面向普通创作者的中文内容改写助手。用户只需要可直接拍摄和复制的成品。",
+          "程序已经按封面点击率、可用的最长退出率和完播率筛选了相似历史内容的优秀与较弱样本。不得修改、虚构或重新计算这些事实。",
+          "根据优秀样本提炼可复用做法，根据较弱样本避免相同问题，但不要在输出文案中提指标数字。",
+          "必须保留用户原意、真实经历和语气，不得添加用户没有提供的身份、数据、效果或承诺。",
+          "只生成一套主方案。若首要问题是封面点击，额外给两个备选标题；否则额外给两个备选开头。",
+          "封面提示词必须能直接复制给图片生成 AI，包含画面主体、构图、封面文字、风格和清晰度要求。",
+          "rewritten_markdown 必须是精简、可直接使用的 Markdown，按输入类型重写标题、正文或完整口播稿。",
+          "只返回约定的 JSON，不要返回解释、证据、数据或额外字段。"
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: [
+          `根据以下内容生成下一条方案：${JSON.stringify(input)}`,
+          "返回结构固定为：",
+          JSON.stringify({
+            input_type: "title | caption | script | mixed",
+            optimization_focus: "一句话说明本次最重要的修改",
+            primary_title: "推荐标题",
+            alternative_titles: ["仅封面点击是首要问题时返回两个"],
+            cover_prompt: "可直接交给图片生成 AI 的完整中文提示词",
+            opening_hook: "可直接说出口的开头",
+            alternative_hooks: ["非封面点击问题时返回两个"],
+            content_structure: ["结构步骤，最多六条"],
+            rewritten_markdown: "完整的 Markdown 成品",
+            validation_focus: "cover_click | opening_retention | completion"
+          })
+        ].join("\n")
+      }
+    ]
+  });
+  const analysis = {
+    ...normalizeNextContentResult(result),
+    model: settings.strategyModel,
+    analyzedAt: new Date().toISOString()
+  };
+  writeDebugLog("bailian", "analyzeNextContent.done", { result, analysis });
+  return analysis;
+}
+
 module.exports = {
   analyzeCover,
+  analyzeNextContent,
   analyzeStrategy,
   config,
   extractJson,
   humanizeStrategyResult,
+  matchSimilarNotes,
+  normalizeMatchedNoteKeys,
+  normalizeNextContentResult,
   validateRecommendation
 };

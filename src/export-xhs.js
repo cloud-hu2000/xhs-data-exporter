@@ -26,6 +26,13 @@ const runLogPath = path.join(
   `export-${runStartedAt.toISOString().replace(/[:.]/g, "-")}.log`
 );
 
+function commandLineMaxNotes() {
+  const index = process.argv.indexOf("--max-notes");
+  if (index < 0) return null;
+  const value = Number(process.argv[index + 1]);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 function logLine(level, args) {
   const text = args
     .map((arg) => {
@@ -450,6 +457,7 @@ async function goNextPage(page, config) {
 
 async function main() {
   const config = loadConfig();
+  const maxNotes = commandLineMaxNotes() || config.maxNotes;
   console.log(`Export run log: ${runLogPath}`);
   console.log(`Retry config: count=${config.exportRetryCount}, waitMs=${config.exportRetryWaitMs}`);
   const browser = await connectToBrowser(config);
@@ -462,7 +470,7 @@ async function main() {
   let pageNo = 1;
   const failures = [];
 
-  while (pageNo <= config.maxPages && exported < config.maxNotes) {
+  while (pageNo <= config.maxPages && exported < maxNotes) {
     await sleep(config.slowMoMs);
     const detailInfo = await countVisibleByTexts(page, config.detailTexts);
 
@@ -473,7 +481,7 @@ async function main() {
 
     console.log(`第 ${pageNo} 页找到 ${detailInfo.count} 个“${detailInfo.text}”按钮。`);
 
-    for (let i = 0; i < detailInfo.count && exported < config.maxNotes; i += 1) {
+    for (let i = 0; i < detailInfo.count && exported < maxNotes; i += 1) {
       exported += 1;
       const result = await exportNoteByIndex(page, config, detailInfo.text, i, exported);
       const failedButtons = (result.results || []).filter((item) => !item.ok);

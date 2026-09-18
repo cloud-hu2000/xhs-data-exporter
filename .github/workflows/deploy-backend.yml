@@ -8,9 +8,13 @@ on:
       - "package.json"
       - "package-lock.json"
       - "src/content-checker-api-server.js"
+      - "src/content-checker-ai-router.js"
       - "src/content-checker-router.js"
       - "src/content-checker-auth.js"
       - "src/content-checker-moderation.js"
+      - "src/bailian-client.js"
+      - "src/debug-logger.js"
+      - "src/config.js"
       - "src/env.js"
   workflow_dispatch:
 
@@ -46,9 +50,13 @@ jobs:
             package.json \
             package-lock.json \
             src/content-checker-api-server.js \
+            src/content-checker-ai-router.js \
             src/content-checker-router.js \
             src/content-checker-auth.js \
             src/content-checker-moderation.js \
+            src/bailian-client.js \
+            src/debug-logger.js \
+            src/config.js \
             src/env.js
 
       - name: Install SSH tools

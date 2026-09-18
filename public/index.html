@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>小红书数据助手</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%229%22 fill=%22%236c5ce7%22/><rect x=%2210%22 y=%2210%22 width=%2212%22 height=%2212%22 rx=%224%22 fill=%22white%22/></svg>" />
+    <link rel="icon" href="./icons/data-screen.svg" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./icons.css" />
   </head>
   <body>
     <div class="workspace">
@@ -16,71 +17,58 @@
           </div>
           <div class="brand-copy">
             <div class="brand-name">小红书数据助手</div>
-            <div class="brand-sub">Creator Analytics</div>
           </div>
         </div>
 
         <nav class="top-navigation" aria-label="主导航">
-          <div class="top-menu-group" data-menu-group="analytics">
-            <button class="top-menu-trigger active" type="button" data-menu-toggle="analytics" aria-expanded="false" aria-controls="analyticsMenu">
-              <span class="top-menu-icon" aria-hidden="true">▦</span>
-              <span>数据分析</span>
-              <span class="top-menu-chevron" aria-hidden="true">⌄</span>
+          <div class="top-menu-group" data-menu-group="precheck">
+            <button class="top-menu-trigger" type="button" data-menu-toggle="precheck" aria-expanded="false" aria-controls="precheckMenu">
+              <span class="top-menu-icon app-icon icon-shield" aria-hidden="true"></span>
+              <span>发布前功能</span>
+              <span class="top-menu-chevron app-icon icon-chevron-down" aria-hidden="true"></span>
             </button>
-            <div id="analyticsMenu" class="top-menu-panel hidden" data-menu-panel="analytics" role="menu" aria-label="数据分析">
-            <button class="menu-item" type="button" data-view="lifecycle">
-              <span class="menu-icon">▥</span>
-              生命周期对比
+            <div id="precheckMenu" class="top-menu-panel hidden" data-menu-panel="precheck" role="menu" aria-label="发布前功能">
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="audit">
+              <span class="menu-icon app-icon icon-check" aria-hidden="true"></span>
+              违规检测
             </button>
-            <button class="menu-item" type="button" data-view="publish">
-              <span class="menu-icon">◷</span>
-              发布时间分析
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="knowledge">
+              <img class="menu-icon icon-image" src="./icons/book.svg" aria-hidden="true" alt="" />
+              知识库
             </button>
-            <button class="menu-item hidden" type="button" data-view="funnel">
-              <span class="menu-icon">◇</span>
-              内容诊断
+            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="practice">
+              <img class="menu-icon icon-image" src="./icons/read-book.svg" aria-hidden="true" alt="" />
+              实操库
             </button>
-            <button class="menu-item" type="button" data-view="cover">
-              <span class="menu-icon">▧</span>
-              封面分析
-            </button>
-            <button class="menu-item active" type="button" data-view="notes">
-              <span class="menu-icon">☷</span>
-              数据总览
-            </button>
-            <button class="menu-item" type="button" data-view="strategy">
-              <span class="menu-icon">✦</span>
-              下一条怎么做
+            <button class="menu-item hidden" type="button" data-view="precheck" data-checker-tab="admin">
+              <img class="menu-icon icon-image" src="./icons/settings.svg" aria-hidden="true" alt="" />
+              管理实操库
             </button>
             </div>
           </div>
 
-          <div class="top-menu-group" data-menu-group="precheck">
-            <button class="top-menu-trigger" type="button" data-menu-toggle="precheck" aria-expanded="false" aria-controls="precheckMenu">
-              <span class="top-menu-icon" aria-hidden="true">✓</span>
-              <span>违规检测</span>
-              <span class="top-menu-chevron" aria-hidden="true">⌄</span>
+          <div class="top-menu-group" data-menu-group="analytics">
+            <button class="top-menu-trigger active" type="button" data-menu-toggle="analytics" aria-expanded="false" aria-controls="analyticsMenu">
+              <span class="top-menu-icon app-icon icon-analysis" aria-hidden="true"></span>
+              <span>发布后功能</span>
+              <span class="top-menu-chevron app-icon icon-chevron-down" aria-hidden="true"></span>
             </button>
-            <div id="precheckMenu" class="top-menu-panel hidden" data-menu-panel="precheck" role="menu" aria-label="违规检测">
-            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="audit">
-              <span class="menu-icon">✓</span>
-              违规检测
+            <div id="analyticsMenu" class="top-menu-panel hidden" data-menu-panel="analytics" role="menu" aria-label="发布后功能">
+            <button class="menu-item hidden" type="button" data-view="funnel">
+              <span class="menu-icon app-icon icon-chart-graph" aria-hidden="true"></span>
+              内容诊断
             </button>
-            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="history">
-              <span class="menu-icon">◷</span>
-              历史检测记录
+            <button class="menu-item active" type="button" data-view="notes">
+              <span class="menu-icon app-icon icon-data-sheet" aria-hidden="true"></span>
+              数据总览
             </button>
-            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="knowledge">
-              <span class="menu-icon">◇</span>
-              知识库
+            <button class="menu-item" type="button" data-view="strategy">
+              <span class="menu-icon app-icon icon-target" aria-hidden="true"></span>
+              下一条怎么做
             </button>
-            <button class="menu-item" type="button" data-view="precheck" data-checker-tab="practice">
-              <span class="menu-icon">▤</span>
-              实操库
-            </button>
-            <button class="menu-item hidden" type="button" data-view="precheck" data-checker-tab="admin">
-              <span class="menu-icon">⚙</span>
-              管理实操库
+            <button class="menu-item" type="button" data-view="experiments">
+              <span class="menu-icon app-icon icon-edit" aria-hidden="true"></span>
+              创作计划
             </button>
             </div>
           </div>
@@ -91,22 +79,31 @@
 
       <main class="main">
         <header class="main-top">
-          <div class="page-heading">
-            <div class="heading-row">
-              <h1>数据总览</h1>
-              <span class="page-kicker">数据看板</span>
+          <div class="main-header-left">
+            <div class="page-heading">
+              <div class="heading-row">
+                <h1>数据总览</h1>
+              </div>
+              <div class="breadcrumb">数据看板 / 数据总览</div>
             </div>
-            <div class="breadcrumb">数据看板 / 数据总览</div>
+            <nav class="page-view-navigation" aria-label="数据分析页面">
+              <button class="button active" type="button" data-view-entry="notes">数据总览</button>
+              <button class="button" type="button" data-view-entry="lifecycle">生命周期对比</button>
+              <button class="button" type="button" data-view-entry="publish">发布时间分析</button>
+            </nav>
+            <nav class="page-view-navigation precheck-view-navigation hidden" aria-label="违规检测页面">
+              <button class="button" type="button" data-checker-view-entry="audit">违规检测</button>
+              <button class="button" type="button" data-checker-view-entry="history">历史检测记录</button>
+            </nav>
           </div>
           <div class="top-actions">
-            <span class="data-status"><i></i> 本地数据已连接</span>
             <button id="refreshBtn" class="button primary" type="button">导入新数据</button>
           </div>
         </header>
 
         <section class="content-card compact-summary">
           <div class="summary-item summary-purple">
-            <span class="summary-icon">▤</span>
+            <span class="summary-icon app-icon icon-data-sheet" aria-hidden="true"></span>
             <div>
               <span>导入笔记</span>
               <strong id="noteCount">-</strong>
@@ -114,7 +111,7 @@
             </div>
           </div>
           <div class="summary-item summary-blue">
-            <span class="summary-icon">◉</span>
+            <span class="summary-icon app-icon icon-eyes" aria-hidden="true"></span>
             <div>
               <span>总曝光量</span>
               <strong id="totalImpressions">-</strong>
@@ -122,7 +119,7 @@
             </div>
           </div>
           <div class="summary-item summary-green">
-            <span class="summary-icon">▶</span>
+            <span class="summary-icon app-icon icon-play" aria-hidden="true"></span>
             <div>
               <span>总观看量</span>
               <strong id="totalViews">-</strong>
@@ -130,14 +127,13 @@
             </div>
           </div>
           <div class="summary-item summary-pink">
-            <span class="summary-icon">♥</span>
+            <span class="summary-icon app-icon icon-like" aria-hidden="true"></span>
             <div>
               <span>总互动量</span>
               <strong id="totalInteractions">-</strong>
               <small>点赞收藏评论</small>
             </div>
           </div>
-          <div class="summary-meta" id="syncMeta">正在读取本地导出数据...</div>
         </section>
 
         <section class="view-panel hidden checker-panel" data-panel="precheck">
@@ -238,91 +234,100 @@
           <div id="coverPagination" class="pagination-bar"></div>
         </section>
 
-        <section class="content-card view-panel hidden" data-panel="strategy">
-          <div class="panel-head">
+        <section class="content-card view-panel hidden next-content-page" data-panel="strategy">
+          <header class="next-content-hero">
+            <span class="panel-kicker">下一条怎么做</span>
+            <h2>把文案变成下一条可直接拍的方案</h2>
+            <p>粘贴标题、正文或口播稿，系统会结合你的历史优胜内容自动优化。</p>
+          </header>
+
+          <section id="nextContentUnavailable" class="next-content-unavailable hidden">
+            <div class="next-content-lock" aria-hidden="true">3</div>
             <div>
-              <h2>下一条怎么做</h2>
-              <p>规则层先确认数据事实，AI 再结合封面、文案和账号历史提出假设与下一轮实验。已导出的中文字幕会自动带入视频转写文本。</p>
+              <h3 id="nextContentUnavailableTitle">历史作品数据不足</h3>
+              <p id="nextContentUnavailableText">导入至少3篇作品后，系统才能结合你的历史表现生成方案。</p>
             </div>
-            <div class="toolbar">
-              <select id="strategyNoteSelect" class="select-input wide-select"></select>
-              <button id="generateStrategyBtn" class="button primary" type="button">生成下一条建议</button>
+            <button class="button primary" type="button" data-import-next-content>去导入数据</button>
+          </section>
+
+          <section id="nextContentComposer" class="next-content-composer hidden">
+            <label for="nextContentDraft">
+              <span>文案 / 口播稿</span>
+              <small>支持标题、正文或完整口播稿</small>
+            </label>
+            <textarea id="nextContentDraft" rows="12" placeholder="粘贴标题、正文或完整口播稿……"></textarea>
+            <div class="next-content-composer-footer">
+              <p>系统将在后台匹配同类内容，不需要选择历史作品。</p>
+              <button id="generateNextContentBtn" class="button primary" type="button">生成下一条方案</button>
             </div>
-          </div>
+            <div id="nextContentActionStatus" class="strategy-action-status" role="status"></div>
+          </section>
 
-          <div class="strategy-workspace">
-            <section class="strategy-input-card">
-              <div class="strategy-section-head">
-                <div>
-                  <h3>内容语境</h3>
-                  <p>标题会自动带入；视频优先读取 Profile 导出目录中的中文字幕，也可继续手动修改。</p>
-                </div>
-                <span id="strategyAiStatus" class="ai-status">读取中</span>
-              </div>
-              <label>
-                原文案 / 图文正文
-                <textarea id="strategyCaption" class="review-textarea" rows="5"></textarea>
-              </label>
-              <label>
-                视频转写文本
-                <textarea id="strategyTranscript" class="review-textarea" rows="6"></textarea>
-              </label>
-              <div id="strategyActionStatus" class="strategy-action-status"></div>
+          <section id="nextContentResult" class="next-content-result hidden" aria-live="polite">
+            <div class="next-content-result-topbar">
+              <button class="button" type="button" data-edit-next-content>修改原文</button>
+              <span id="nextContentSaveStatus" class="next-content-save-status">已自动保存</span>
+            </div>
+
+            <section class="next-content-focus">
+              <span>本次优化重点</span>
+              <h3 id="nextContentFocus"></h3>
             </section>
 
-            <section class="strategy-facts-card">
-              <div class="strategy-section-head">
-                <div>
-                  <h3>程序确认的数据事实</h3>
-                  <p>与当前账号样本的中位数、前 25% 和后 25% 比较。</p>
+            <div class="next-content-output-grid">
+              <section class="next-content-output-card">
+                <div class="next-content-card-head">
+                  <h3>封面怎么做</h3>
+                  <button class="button" type="button" data-copy-next-content="cover">复制提示词</button>
                 </div>
-                <span id="strategySampleSize" class="median-sample">-</span>
-              </div>
-              <div id="strategyFacts" class="fact-grid"></div>
-            </section>
+                <div id="nextContentCoverPrompt" class="next-content-prompt"></div>
+              </section>
 
-            <section class="strategy-cover-card">
-              <div class="strategy-section-head">
-                <div>
-                  <h3>AI 封面解读</h3>
-                  <p>模型只负责解释视觉语境并提出假设，点击率事实仍来自数据层。</p>
-                </div>
-              </div>
-              <div id="strategyCoverAnalysis" class="analysis-body empty-analysis">尚未分析封面。</div>
-            </section>
+              <section class="next-content-output-card">
+                <div class="next-content-card-head"><h3>开头怎么说</h3></div>
+                <p id="nextContentOpening" class="next-content-opening"></p>
+                <div id="nextContentAlternatives" class="next-content-alternatives"></div>
+              </section>
 
-            <section class="strategy-result-card">
-              <div class="strategy-section-head">
-                <div>
-                  <h3>内容实验建议</h3>
-                  <p>每条建议会生成交付标题、封面提示词、前 5 秒、结构、发布时间和验证指标。</p>
+              <section class="next-content-output-card next-content-copy-card">
+                <div class="next-content-card-head">
+                  <div>
+                    <h3>内容怎么写</h3>
+                    <p id="nextContentStructure" class="next-content-structure"></p>
+                  </div>
+                  <button class="button" type="button" data-copy-next-content="markdown">复制优化后文案</button>
                 </div>
-                <button id="openExperimentLabBtn" class="button" type="button">查看内容实验室</button>
-              </div>
-              <div id="strategyResult" class="strategy-result empty-analysis">尚未生成建议。</div>
-            </section>
-          </div>
+                <div id="nextContentMarkdown" class="next-content-markdown" contenteditable="true" role="textbox" aria-label="可编辑的优化后文案"></div>
+              </section>
+            </div>
+
+            <details class="next-content-evidence">
+              <summary>为什么这样建议</summary>
+              <div id="nextContentEvidence" class="next-content-evidence-body"></div>
+            </details>
+
+            <div class="next-content-result-actions">
+              <button id="sendToContentCheckerBtn" class="button" type="button">带去违规检测</button>
+              <button id="saveCreationPlanBtn" class="button primary" type="button">保存为创作计划</button>
+            </div>
+          </section>
         </section>
 
         <section class="content-card view-panel hidden" data-panel="experiments">
           <div class="panel-head">
             <div>
-              <h2>内容实验室</h2>
-              <p>把 AI 方案落成实验卡片，并在下一次导入数据后匹配验证。</p>
-            </div>
-            <div class="toolbar">
-              <button id="experimentImportBtn" class="button primary" type="button">导入新数据</button>
+              <h2>创作计划</h2>
+              <p>查看已经生成并保存在本机的下一条内容方案。</p>
             </div>
           </div>
 
-          <div id="experimentLab" class="experiment-lab"></div>
+          <div id="creationPlanList" class="experiment-lab"></div>
         </section>
 
         <section class="content-card view-panel" data-panel="notes">
           <div class="panel-head">
             <div>
               <h2>数据总览</h2>
-              <p>按关键指标横向比较每篇笔记，包含 CES评分（点赞×1 + 收藏×1 + 评论×4 + 分享×4 + 关注/涨粉×8）等衍生指标。</p>
             </div>
             <div class="toolbar">
               <input id="notesCompareSearch" class="search-input" type="search" placeholder="搜索标题、类型或标签" />
@@ -345,16 +350,16 @@
             </div>
           </div>
 
-          <div id="noteReviewModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="noteReviewModalTitle">
+          <div id="noteReviewModal" class="modal-backdrop hidden" tabindex="-1" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="noteReviewModalTitle">
             <section class="note-review-card">
               <div class="note-review-head">
-                <div class="review-title-icon" aria-hidden="true">◇</div>
+                <div class="review-title-icon app-icon icon-edit" aria-hidden="true"></div>
                 <div>
                   <span class="modal-eyebrow">笔记复盘</span>
                   <h3 id="noteReviewModalTitle">补充笔记标签</h3>
                   <p>补充内容事实，数据会保存在本机，重新导入 Excel 不会覆盖。</p>
                 </div>
-                <button class="modal-close" type="button" data-close-review-modal aria-label="关闭弹窗">×</button>
+                <button class="modal-close" type="button" data-close-review-modal aria-label="关闭弹窗"><span class="app-icon icon-close" aria-hidden="true"></span></button>
               </div>
               <div class="note-review-selector">
                 <label for="reviewNoteSelect">当前笔记</label>
@@ -408,6 +413,7 @@
             <table class="data-table notes-compare-table">
               <thead>
                 <tr>
+                  <th>封面分析</th>
                   <th data-table="notes" data-sort-key="title">标题</th>
                   <th data-table="notes" data-sort-key="publishedAt">发布时间</th>
                   <th data-table="notes" data-sort-key="type">内容类型</th>
@@ -467,18 +473,10 @@
 
           <div class="segmented" id="filterTabs">
             <button class="active" data-filter="all" type="button">全部</button>
-            <button data-filter="fast" type="button">启动同类前 25%</button>
-            <button data-filter="tail" type="button">后劲同类前 25%</button>
-            <button data-filter="fade" type="button">前高后低</button>
-            <button data-filter="search" type="button">长尾突出</button>
           </div>
 
           <div class="chart-layout">
             <div id="lifecycleChart" class="lifecycle-chart"></div>
-            <aside class="insight-panel">
-              <h3>判读重点</h3>
-              <ul id="insightList"></ul>
-            </aside>
           </div>
         </section>
 
@@ -560,6 +558,7 @@
     <script src="./content-diagnostics.js"></script>
     <script src="/vendor/dompurify/purify.min.js"></script>
     <script src="/vendor/easymde/easymde.min.js"></script>
+    <script src="/vendor/flowbite/flowbite.min.js"></script>
     <script src="./content-checker.js"></script>
     <script src="./app.js"></script>
   </body>

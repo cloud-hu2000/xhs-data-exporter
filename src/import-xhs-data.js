@@ -182,7 +182,7 @@ function parseSeries(workbook, meta, granularity, recognition) {
 }
 
 function metricBelongsToKind(metric, kind) {
-  const basic = new Set(["曝光数", "观看数", "封面点击率", "平均观看时长", "完播率", "2秒退出率", "涨粉数"]);
+  const basic = new Set(["曝光数", "观看数", "封面点击率", "平均观看时长", "完播率", "2秒退出率", "3秒退出率", "5秒退出率", "涨粉数"]);
   const interaction = new Set(["点赞数", "评论数", "收藏数", "分享数", "弹幕数"]);
   if (kind === "basic") return basic.has(metric);
   if (kind === "interaction") return interaction.has(metric);
@@ -240,6 +240,10 @@ function latestFiles(files) {
 
 function mergeBasic(note, metrics) {
   const hasOfficialCoverClickRate = Object.prototype.hasOwnProperty.call(metrics, "封面点击率");
+  const hasCompletionRate = Object.prototype.hasOwnProperty.call(metrics, "完播率");
+  const hasTwoSecondExitRate = Object.prototype.hasOwnProperty.call(metrics, "2秒退出率");
+  const hasThreeSecondExitRate = Object.prototype.hasOwnProperty.call(metrics, "3秒退出率");
+  const hasFiveSecondExitRate = Object.prototype.hasOwnProperty.call(metrics, "5秒退出率");
   Object.assign(note, {
     impressions: metrics["曝光数"] ?? note.impressions ?? 0,
     views: metrics["观看数"] ?? note.views ?? 0,
@@ -247,7 +251,13 @@ function mergeBasic(note, metrics) {
     hasOfficialCoverClickRate: hasOfficialCoverClickRate || note.hasOfficialCoverClickRate || false,
     avgWatchSeconds: metrics["平均观看时长"] ?? note.avgWatchSeconds ?? 0,
     completionRatePct: metrics["完播率"] ?? note.completionRatePct ?? 0,
+    hasCompletionRate: hasCompletionRate || note.hasCompletionRate || false,
     twoSecondExitRatePct: metrics["2秒退出率"] ?? note.twoSecondExitRatePct ?? 0,
+    hasTwoSecondExitRate: hasTwoSecondExitRate || note.hasTwoSecondExitRate || false,
+    threeSecondExitRatePct: metrics["3秒退出率"] ?? note.threeSecondExitRatePct ?? 0,
+    hasThreeSecondExitRate: hasThreeSecondExitRate || note.hasThreeSecondExitRate || false,
+    fiveSecondExitRatePct: metrics["5秒退出率"] ?? note.fiveSecondExitRatePct ?? 0,
+    hasFiveSecondExitRate: hasFiveSecondExitRate || note.hasFiveSecondExitRate || false,
     followersGained: metrics["涨粉数"] ?? note.followersGained ?? 0
   });
 }

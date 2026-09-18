@@ -156,7 +156,7 @@ xhs-data-exporter/
   - 使用 `.chrome-profile-<debugPort>` 保存登录态。
   - 当前 `config.json` 使用调试端口 `9333`；源码默认值是 `9222`。
 - `src/browser-path.js`
-  - 优先读取 `CHROME_PATH`，否则搜索常见 Chrome/Edge 安装目录。
+  - 搜索常见 Chrome/Edge 安装目录。
 
 ### 5.2 页面导出层
 
@@ -211,7 +211,7 @@ xhs-data-exporter/
 ### 5.4 仪表盘与存储层
 
 - `src/dashboard-server.js`
-  - 默认监听 `5178`，可用 `XHS_DASHBOARD_PORT` 修改。
+  - 固定监听本机 `5178` 端口。
   - 若主数据不存在，`GET /api/data` 会触发一次导入；主数据存在时直接读取，不自动扫描新下载文件。
   - 将统一数据与人工复盘、AI 分析结果、内容实验卡片组合后返回前端。
   - 将发布前检测挂载到同一进程的 `/api/content-checker/*`；不会启动第二个 HTTP 端口。
@@ -318,31 +318,19 @@ contentExperiments   AI 方案启动的实验卡片、匹配笔记和验证快�
 - `exportRetryCount`、`exportRetryWaitMs`：失败重试。
 - `exportAllButtonsInDetail`：是否点击详情页全部导出按钮。
 
-可覆盖的环境变量见 `src/config.js`，包括 `XHS_DEBUG`、`XHS_DEBUG_PORT`、`XHS_MAX_PAGES`、`XHS_MAX_NOTES`、`XHS_EXPORT_ALL_BUTTONS` 和重试参数。
-`XHS_DEBUG=true` 时会把 AI 接口前后的详细日志写入 `logs/debug-YYYY-MM-DD.log`；关闭或未设置时不输出 debug 日志。
+除 `XHS_DEBUG` 外，导出参数均由 `config.json` 和代码默认值确定。`XHS_DEBUG=true` 时会把 AI 接口前后的详细日志写入 `logs/debug-YYYY-MM-DD.log`；关闭或未设置时不输出 debug 日志。
 
-Profile 导出使用：
-
-- `XHS_PROFILE_URL`：目标用户主页。
-- `XHS_PROFILE_MAX_NOTES`：本次最多点击的作品数。
-- `XHS_PROFILE_DOWNLOAD_MEDIA=false`：只保存详情元数据，不下载媒体。
+Profile 导出的目标主页、作品上限和媒体下载策略均由代码固定。
 
 ### `.env`
 
-从 `.env.example` 复制，禁止提交真实密钥：
-
-- `XHS_DEBUG`
-- `DASHSCOPE_API_KEY`
-- `DASHSCOPE_BASE_URL`
-- `DASHSCOPE_VISION_MODEL`
-- `DASHSCOPE_STRATEGY_MODEL`
-- `DASHSCOPE_ASR_MODEL`
+本地无需为 AI 或发布前检测创建 `.env`。仪表盘默认请求 `http://101.37.116.48:5178/api/content-checker`，百炼和数据库配置只存在于服务器私有环境。`XHS_DEBUG` 仍可作为可选的本地调试开关。
 
 ## 10. 排障入口矩阵
 
 | 现象 | 先看 | 再检查 |
 |---|---|---|
-| 找不到 Chrome/Edge | `browser-path.js` | `CHROME_PATH`、浏览器安装路径 |
+| 找不到 Chrome/Edge | `browser-path.js` | 浏览器安装路径 |
 | 无法连接浏览器 | `open-browser.js`、`config.json` | CDP 端口、Profile、`/json/version` |
 | 找不到“详情/导出/下一页” | `inspect-page.js` | 页面登录态、按钮文案、`config.json` |
 | 点击后没有文件 | `export-xhs.js` | 最新 export 日志、超时、异步任务、下载权限 |
@@ -355,7 +343,7 @@ Profile 导出使用：
 | 人工标签保存失败 | `/api/note-reviews` | `noteKey`、`data/note-reviews.json` 写权限 |
 | 图表或表格错误 | `public/app.js` | `/api/data` 响应、浏览器控制台、DOM ID |
 | 相对诊断不出现 | `content-diagnostics.js` | peer 是否达到 3 篇、复盘标签是否可分组 |
-| AI 按钮不可用/报错 | `dashboard-server.js`、`bailian-client.js` | `.env`、`/health`、模型名、API 响应；必要时开启 `XHS_DEBUG=true` 查看 `logs/debug-YYYY-MM-DD.log` |
+| AI 按钮不可用/报错 | `dashboard-server.js`、API 服务 | `/health`、模型 API 响应；必要时开启 `XHS_DEBUG=true` 查看 `logs/debug-YYYY-MM-DD.log` |
 | 内容实验卡片或匹配失败 | `content-experiment-store.js`、`/api/content-experiments*` | `noteKey`、`data/content-experiments.json` 写权限、导入后笔记是否存在 |
 | 仪表盘无法启动 | `dashboard-server.js` | 5178 端口、`logs/dashboard.log`、依赖 |
 

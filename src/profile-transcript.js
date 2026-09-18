@@ -9,26 +9,47 @@ function normalizeTitle(value) {
 }
 
 function parseSrt(text) {
-  const cues = String(text || "")
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n\s*\r?\n/)
-    .map((block) => block
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => {
-        if (!line) return false;
-        if (/^\d+$/.test(line)) return false;
-        return !/^\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(line);
-      })
-      .join("")
-    )
-    .filter(Boolean);
+  const cues = parseSrtCues(text).map((cue) => cue.text);
 
   return cues.reduce((result, cue) => {
     if (!result) return cue;
     const separator = /[，。！？；：,.!?;:]$/.test(result) ? "" : "，";
     return `${result}${separator}${cue}`;
   }, "");
+}
+
+function timestampSeconds(value) {
+  const match = String(value || "").trim().match(/^(\d{2}):(\d{2}):(\d{2})[,.](\d{3})$/);
+  if (!match) return null;
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(match[4]) / 1000;
+}
+
+function parseSrtCues(text) {
+  return String(text || "")
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n\s*\r?\n/)
+    .map((block) => {
+      const lines = block.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const timing = lines.find((line) => line.includes("-->"));
+      const match = timing?.match(/^(\d{2}:\d{2}:\d{2}[,.]\d{3})\s+-->\s+(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+      const content = lines
+        .filter((line) => !/^\d+$/.test(line) && line !== timing)
+        .join("");
+      if (!content || !match) return null;
+      return {
+        startSeconds: timestampSeconds(match[1]),
+        endSeconds: timestampSeconds(match[2]),
+        text: content
+      };
+    })
+    .filter(Boolean);
+}
+
+function openingExcerpt(cues, seconds) {
+  return (cues || [])
+    .filter((cue) => cue.startSeconds != null && cue.startSeconds < seconds)
+    .map((cue) => cue.text)
+    .join("，");
 }
 
 function readDescription(filePath) {
@@ -98,10 +119,17 @@ function createProfileTranscriptReader(projectRoot) {
 
     const subtitlePath = findChineseSubtitle(record);
     if (subtitlePath) {
-      const transcript = parseSrt(fs.readFileSync(subtitlePath, "utf8"));
+      const subtitle = fs.readFileSync(subtitlePath, "utf8");
+      const cues = parseSrtCues(subtitle);
+      const transcript = parseSrt(subtitle);
       if (transcript) {
         return {
           transcript,
+          openingExcerpts: {
+            2: openingExcerpt(cues, 2),
+            3: openingExcerpt(cues, 3),
+            5: openingExcerpt(cues, 5)
+          },
           source: "profile-srt",
           noteId: record.noteId || "",
           subtitleFile: path.relative(projectRoot, subtitlePath)
@@ -129,5 +157,7 @@ function createProfileTranscriptReader(projectRoot) {
 module.exports = {
   createProfileTranscriptReader,
   normalizeTitle,
-  parseSrt
+  openingExcerpt,
+  parseSrt,
+  parseSrtCues
 };

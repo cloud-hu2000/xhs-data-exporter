@@ -26,6 +26,18 @@ const FIELD_DEFINITIONS = [
     kind: "basic",
     aliases: ["2s退出率", "2s退出率(%)", "2秒退出率(%)"]
   },
+  {
+    id: "threeSecondExitRate",
+    canonical: "3秒退出率",
+    kind: "basic",
+    aliases: ["3s退出率", "3s退出率(%)", "3秒退出率(%)"]
+  },
+  {
+    id: "fiveSecondExitRate",
+    canonical: "5秒退出率",
+    kind: "basic",
+    aliases: ["5s退出率", "5s退出率(%)", "5秒退出率(%)"]
+  },
   { id: "followersGained", canonical: "涨粉数", kind: "basic", aliases: ["新增粉丝数", "新增关注数"] },
   { id: "likes", canonical: "点赞数", kind: "interaction", aliases: ["点赞", "获赞数"] },
   { id: "comments", canonical: "评论数", kind: "interaction", aliases: ["评论"] },

@@ -23,13 +23,7 @@ chmod +x run.command
 
 工具会自动寻找 macOS 的 Google Chrome、Chrome for Testing、Chromium 或 Microsoft Edge。每次都会使用项目内独立的浏览器配置目录（例如 `.chrome-profile-9222`），不会占用或修改日常 Chrome 的登录资料。首次运行请在这个独立窗口中登录小红书；之后会保留登录状态。
 
-如果 Chrome 安装在非标准位置，可指定可执行文件后运行：
-
-```bash
-CHROME_PATH="/完整路径/Google Chrome.app/Contents/MacOS/Google Chrome" ./run.command
-```
-
-若要将独立配置目录放在其他位置，可额外设置 `XHS_BROWSER_PROFILE_DIR`。
+请将 Chrome、Chrome for Testing、Chromium 或 Microsoft Edge 安装到系统标准位置。
 
 首次运行会自动检查并安装依赖。推荐选择“一键完整流程”，按提示完成登录确认后，工具会自动：
 
@@ -38,6 +32,8 @@ CHROME_PATH="/完整路径/Google Chrome.app/Contents/MacOS/Google Chrome" ./run
 3. 启动并打开分析中心。
 
 也可以在菜单中单独执行测试导出、打开登录浏览器、导入数据、检查页面按钮等操作。
+
+分析中心的界面由 Tailwind CSS 构建，并使用 Flowbite 组件。运行仪表盘命令时会自动生成样式；开发样式时可另开终端运行 `npm run dashboard:css:watch`。
 
 命令行用户可以直接传入命令：
 

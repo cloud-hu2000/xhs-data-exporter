@@ -7,11 +7,9 @@ const { safeFilename, sleep } = require("./playwright-utils");
 
 installConsoleLogger();
 
-const profileUrl =
-  process.env.XHS_PROFILE_URL ||
-  "https://www.xiaohongshu.com/user/profile/642c02490000000011020cf8";
-const maxNotes = Number(process.env.XHS_PROFILE_MAX_NOTES || 500);
-const downloadMedia = process.env.XHS_PROFILE_DOWNLOAD_MEDIA !== "false";
+const profileUrl = "https://www.xiaohongshu.com/user/profile/642c02490000000011020cf8";
+const maxNotes = 500;
+const downloadMedia = true;
 const outputDir = path.join(projectRoot, "profile-exports");
 const manifestPath = path.join(outputDir, "manifest.json");
 

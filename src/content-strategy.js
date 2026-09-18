@@ -39,6 +39,169 @@ function noteMetrics(note) {
   };
 }
 
+const NEXT_CONTENT_METRICS = {
+  cover: {
+    key: "officialCoverClickRate",
+    label: "封面点击",
+    lowerIsBetter: false,
+    value(note) {
+      const available = Boolean(note.hasOfficialCoverClickRate) || Number(note.coverClickRatePct || 0) > 0;
+      return available ? rate(note.coverClickRatePct) : null;
+    }
+  },
+  completion: {
+    key: "completionRate",
+    label: "内容完播",
+    lowerIsBetter: false,
+    value(note) {
+      const available = Boolean(note.hasCompletionRate) || Number(note.completionRatePct || 0) > 0;
+      return available ? rate(note.completionRatePct) : null;
+    }
+  }
+};
+
+const EXIT_RATE_DEFINITIONS = [
+  {
+    seconds: 5,
+    key: "fiveSecondExitRate",
+    field: "fiveSecondExitRatePct",
+    flag: "hasFiveSecondExitRate"
+  },
+  {
+    seconds: 3,
+    key: "threeSecondExitRate",
+    field: "threeSecondExitRatePct",
+    flag: "hasThreeSecondExitRate"
+  },
+  {
+    seconds: 2,
+    key: "twoSecondExitRate",
+    field: "twoSecondExitRatePct",
+    flag: "hasTwoSecondExitRate"
+  }
+];
+
+function hasMetricValue(note, field, flag) {
+  return Boolean(note?.[flag]) || Number(note?.[field] || 0) > 0;
+}
+
+function selectExitRateMetric(notes, minimumCount = 3) {
+  for (const definition of EXIT_RATE_DEFINITIONS) {
+    const count = notes.filter((note) => hasMetricValue(note, definition.field, definition.flag)).length;
+    if (count >= minimumCount) {
+      return {
+        ...definition,
+        label: "开头留存",
+        lowerIsBetter: true,
+        count,
+        value(note) {
+          return hasMetricValue(note, definition.field, definition.flag)
+            ? rate(note[definition.field])
+            : null;
+        }
+      };
+    }
+  }
+  return null;
+}
+
+function nextContentMetricDefinitions(notes) {
+  const definitions = { ...NEXT_CONTENT_METRICS };
+  const opening = selectExitRateMetric(notes);
+  if (opening) definitions.opening = opening;
+  return definitions;
+}
+
+function buildNextContentStatus(notes = []) {
+  const totalNotes = notes.length;
+  const opening = selectExitRateMetric(notes);
+  const metricCounts = {
+    cover: notes.filter((note) => NEXT_CONTENT_METRICS.cover.value(note) != null).length,
+    opening: opening?.count || 0,
+    completion: notes.filter((note) => NEXT_CONTENT_METRICS.completion.value(note) != null).length
+  };
+  const hasComparableMetric = Object.values(metricCounts).some((count) => count >= 3);
+  const eligible = totalNotes >= 3 && hasComparableMetric;
+  let reason = "";
+  if (totalNotes < 3) reason = `还差 ${3 - totalNotes} 篇作品数据`;
+  else if (!hasComparableMetric) reason = "暂时没有足够的点击率、退出率或完播率数据";
+  return {
+    eligible,
+    totalNotes,
+    minimumNotes: 3,
+    remainingNotes: Math.max(0, 3 - totalNotes),
+    reason,
+    metricCounts,
+    exitRateSeconds: opening?.seconds || null
+  };
+}
+
+function noteReference(note) {
+  return {
+    noteKey: note.noteKey,
+    title: note.title || "未命名作品",
+    coverImageUrl: note.coverImageUrl || ""
+  };
+}
+
+function rankedMetricGroup(notes, definition) {
+  const rows = notes
+    .map((note) => ({ note, value: definition.value(note) }))
+    .filter((item) => item.value != null && Number.isFinite(item.value))
+    .sort((left, right) => left.value - right.value);
+  if (rows.length < 3) return null;
+  const low = rows.slice(0, 3);
+  const high = rows.slice(-3).reverse();
+  const strong = definition.lowerIsBetter ? low : high;
+  const weak = definition.lowerIsBetter ? high : low;
+  const serialize = (items) => items.map(({ note, value }) => ({
+    ...noteReference(note),
+    value,
+    review: note.review || null
+  }));
+  return {
+    key: definition.key,
+    label: definition.label,
+    lowerIsBetter: Boolean(definition.lowerIsBetter),
+    sampleSize: rows.length,
+    strong: serialize(strong),
+    weak: serialize(weak)
+  };
+}
+
+function buildActionableEvidence(notes = [], matchedNoteKeys = []) {
+  const matched = new Set(matchedNoteKeys || []);
+  const selectedNotes = matched.size >= 3
+    ? notes.filter((note) => matched.has(note.noteKey))
+    : notes;
+  const candidates = selectedNotes.length >= 3 ? selectedNotes : notes;
+  const definitions = nextContentMetricDefinitions(candidates);
+  const groups = Object.fromEntries(
+    Object.entries(definitions)
+      .map(([name, definition]) => [name, rankedMetricGroup(candidates, definition)])
+      .filter(([, group]) => Boolean(group))
+  );
+  return {
+    matchedNoteKeys: candidates.map((note) => note.noteKey),
+    exitRateSeconds: definitions.opening?.seconds || null,
+    groups
+  };
+}
+
+function referencesForClient(evidence = {}) {
+  return Object.fromEntries(
+    ["cover", "opening", "completion"].map((name) => {
+      const group = evidence.groups?.[name];
+      const strip = (items) => (items || []).map(({ noteKey, title, coverImageUrl }) => ({ noteKey, title, coverImageUrl }));
+      return [name, {
+        label: group?.label || ({ cover: "封面参考", opening: "开头参考", completion: "内容结构参考" }[name]),
+        strong: strip(group?.strong),
+        weak: strip(group?.weak)
+      }];
+    })
+  );
+}
+
 function quantile(sorted, q) {
   if (sorted.length === 0) return null;
   if (sorted.length === 1) return sorted[0];
@@ -169,9 +332,13 @@ function buildEvidenceCatalog(notes) {
 
 module.exports = {
   METRICS,
+  buildActionableEvidence,
   buildFactDiagnostics,
   buildEvidenceCatalog,
+  buildNextContentStatus,
   compactAccountContext,
   noteMetrics,
-  quantile
+  quantile,
+  referencesForClient,
+  selectExitRateMetric
 };

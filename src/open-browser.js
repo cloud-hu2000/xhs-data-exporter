@@ -9,11 +9,8 @@ installConsoleLogger();
 
 const config = loadConfig();
 const browserPath = findBrowserExecutable();
-// 始终使用专用 profile，避免占用或修改用户平时使用的 Chrome profile。
-// 需要把 profile 放到其他磁盘时，可设置 XHS_BROWSER_PROFILE_DIR。
-const profileDir = path.resolve(
-  process.env.XHS_BROWSER_PROFILE_DIR || path.join(projectRoot, `.chrome-profile-${config.debugPort}`)
-);
+// 始终使用项目内的专用 profile，避免占用或修改用户平时使用的 Chrome profile。
+const profileDir = path.resolve(path.join(projectRoot, `.chrome-profile-${config.debugPort}`));
 
 fs.mkdirSync(profileDir, { recursive: true });
 
