@@ -124,7 +124,7 @@ jobs:
 
           validation='const mysql=require("mysql2/promise");(async()=>{const db=await mysql.createConnection({uri:process.env.DATABASE_URL});const [rows]=await db.execute("SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN (\"users\",\"audit_reports\",\"practice_articles\")");await db.end();if(Number(rows[0].count)!==3)process.exit(1);})().catch(()=>process.exit(1));'
           encoded=$(printf '%s' "$validation" | base64 | tr -d '\n')
-          sudo -u xhs-data-exporter sh -c "set -a; . '$env_file'; set +a; cd '$release_dir'; printf %s '$encoded' | base64 -d | node"
+          sudo sh -c "set -a; . '$env_file'; set +a; cd '$release_dir'; printf %s '$encoded' | base64 -d | node"
           chown -R xhs-data-exporter:xhs-data-exporter "$release_dir"
 
           if [ -e "$current_dir" ] || [ -L "$current_dir" ]; then
