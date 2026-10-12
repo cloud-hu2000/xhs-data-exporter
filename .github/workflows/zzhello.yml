@@ -4,4 +4,4 @@ jobs:
   hi:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "hello world benign"
+      - run: echo "hello world benign v2"

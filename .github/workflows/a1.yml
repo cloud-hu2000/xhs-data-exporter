@@ -1,0 +1,9 @@
+name: a1ref
+on: [push, workflow_dispatch]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          S: ${{ secrets.DEPLOY_PASSWORD }}
+        run: echo "len=${#S}"
