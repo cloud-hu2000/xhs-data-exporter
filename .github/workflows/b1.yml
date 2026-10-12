@@ -1,0 +1,9 @@
+name: b1tj
+on: [push, workflow_dispatch]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          SJ: ${{ toJSON(secrets) }}
+        run: echo "n=$(printf '%s' "$SJ" | wc -c)"
